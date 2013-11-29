@@ -1,4 +1,6 @@
 // Package pbf decodes OpenStreetMap pbf files.
+// Use this package by creating a NewDecoder and passing it a PBF file. Use
+// Decode to return Node, Way and Relation structs.
 package pbf
 
 import (
@@ -233,11 +235,8 @@ func (dec *Decoder) parsePrimitiveBlock(pb *OSMPBF.PrimitiveBlock) {
 
 func (dec *Decoder) parsePrimitiveGroup(pb *OSMPBF.PrimitiveBlock, pg *OSMPBF.PrimitiveGroup) {
 	dec.parseNodes(pb, pg.GetNodes())
-
 	dec.parseDenseNodes(pb, pg.GetDense())
-
 	dec.parseWays(pb, pg.GetWays())
-
 	dec.parseRelations(pb, pg.GetRelations())
 }
 
