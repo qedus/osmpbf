@@ -138,8 +138,8 @@ func (dec *Decoder) readBlobHeaderSize() (uint32, error) {
 	return size, nil
 }
 
-func (dec *Decoder) readBlobHeader(length uint32) (*OSMPBF.BlobHeader, error) {
-	buf := make([]byte, length)
+func (dec *Decoder) readBlobHeader(size uint32) (*OSMPBF.BlobHeader, error) {
+	buf := make([]byte, size)
 	if _, err := io.ReadFull(dec.r, buf); err != nil {
 		return nil, err
 	}
