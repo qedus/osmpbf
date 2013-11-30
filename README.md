@@ -6,7 +6,7 @@ Package pbf is used to decode OpenStreetMap pbf files.
 ## Installation
 
 ```bash
-$ go get github.com/qedus/pdf
+$ go get github.com/qedus/pbf
 ```
 
 ## Usage
@@ -48,7 +48,7 @@ Usage is similar to `json.Decode`.
 
 ## Performance
 
-My old 2.53 GHz Intel Core 2 Duo MacBook Pro with a SATA hard drive can run the above program over the whole planet as of late 2013 in just over 1 hour. The code is probably more disk IO bound than CPU bound though.
+My old 2.53 GHz Intel Core 2 Duo MacBook Pro with a SATA hard drive can run the above program over the whole planet as of late 2013 in just over 1 hour. The code is probably more disk IO bound than CPU bound.
 
 ## To Do
 
