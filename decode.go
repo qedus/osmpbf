@@ -270,7 +270,7 @@ func (dec *Decoder) parseDenseNodes(pb *OSMPBF.PrimitiveBlock, dn *OSMPBF.DenseN
 	ids := dn.GetId()
 	lats := dn.GetLat()
 	lons := dn.GetLon()
-	tu := &tagUnpacker{st, dn.GetKeysVals(), 0}
+	tu := tagUnpacker{st, dn.GetKeysVals(), 0}
 	id, lat, lon := int64(0), int64(0), int64(0)
 	for index := range ids {
 		id = ids[index] + id
