@@ -13,7 +13,6 @@ import (
 	"github.com/qedus/pbf/OSMPBF"
 	"io"
 	"io/ioutil"
-	"strconv"
 )
 
 const (
@@ -28,8 +27,9 @@ const (
 )
 
 var (
-	parseCapabilities = map[string]bool{"OsmSchema-V0.6": true,
-		"DenseNodes": true}
+	parseCapabilities = map[string]bool{
+		"OsmSchema-V0.6": true,
+		"DenseNodes":     true}
 )
 
 type Node struct {
@@ -65,10 +65,7 @@ type Member struct {
 	Type MemberType
 }
 
-func (m Member) String() string {
-	return strconv.FormatInt(m.ID, 10)
-}
-
+// A Decoder reads and decodes OpenStreetMap PBF data from an input stream.
 type Decoder struct {
 	r io.Reader
 
@@ -76,12 +73,17 @@ type Decoder struct {
 	objectIndex int
 }
 
+// NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{r, make([]interface{}, 0), 0}
 }
 
+// Decode reads the next object from the input stream and returns either a
+// Node, Way or Relation struct representing the underlying OpenStreetMap PBF
+// data.
+//
+// The end of the input stream is reported by an io.EOF error.
 func (dec *Decoder) Decode() (interface{}, error) {
-	// Fill the objectQueue
 	if dec.objectIndex >= len(dec.objectQueue) {
 		dec.objectQueue = dec.objectQueue[:0]
 		dec.objectIndex = 0
@@ -90,9 +92,8 @@ func (dec *Decoder) Decode() (interface{}, error) {
 		}
 	}
 
-	v := dec.objectQueue[dec.objectIndex]
 	dec.objectIndex++
-	return v, nil
+	return dec.objectQueue[dec.objectIndex-1], nil
 }
 
 func (dec *Decoder) readNextPrimitiveBlock() error {
@@ -352,7 +353,6 @@ func extractMembers(rel *OSMPBF.Relation) []*Member {
 		}
 		members = append(members, &Member{memID, t})
 	}
-
 	return members
 }
 
