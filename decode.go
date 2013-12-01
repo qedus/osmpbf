@@ -20,12 +20,6 @@ const (
 	maxBlobSize       = 32 * 1024 * 1024
 )
 
-const (
-	NodeType MemberType = iota
-	WayType
-	RelationType
-)
-
 var (
 	parseCapabilities = map[string]bool{
 		"OsmSchema-V0.6": true,
@@ -60,9 +54,16 @@ type Relation struct {
 
 type MemberType int
 
+const (
+	NodeType MemberType = iota
+	WayType
+	RelationType
+)
+
 type Member struct {
 	ID   int64
 	Type MemberType
+	Role string
 }
 
 // A Decoder reads and decodes OpenStreetMap PBF data from an input stream.
@@ -336,22 +337,24 @@ func (dec *Decoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way) {
 	}
 }
 
-func extractMembers(rel *OSMPBF.Relation) []*Member {
+func extractMembers(stringTable [][]byte, rel *OSMPBF.Relation) []*Member {
 	memIDs := rel.GetMemids()
 	types := rel.GetTypes()
-	members := make([]*Member, 0, len(memIDs))
+	roleIDs := rel.GetRolesSid()
+
 	memID := int64(0)
+	members := make([]*Member, 0, len(memIDs))
 	for index := range memIDs {
 		memID = memIDs[index] + memID
-		memType := types[index]
-		t := NodeType
-		switch memType {
+		memType := NodeType
+		switch types[index] {
 		case OSMPBF.Relation_WAY:
-			t = WayType
+			memType = WayType
 		case OSMPBF.Relation_RELATION:
-			t = RelationType
+			memType = RelationType
 		}
-		members = append(members, &Member{memID, t})
+		role := string(stringTable[roleIDs[index]])
+		members = append(members, &Member{memID, memType, role})
 	}
 	return members
 }
@@ -361,8 +364,7 @@ func (dec *Decoder) parseRelations(pb *OSMPBF.PrimitiveBlock, relations []*OSMPB
 	for _, rel := range relations {
 		id := rel.GetId()
 		tags := extractTags(st, rel.GetKeys(), rel.GetVals())
-
-		members := extractMembers(rel)
+		members := extractMembers(st, rel)
 
 		dec.objectQueue = append(dec.objectQueue,
 			&Relation{id, tags, members})
