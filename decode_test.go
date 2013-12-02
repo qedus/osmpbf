@@ -1,8 +1,8 @@
-package pbf_test
+package osmpbf_test
 
 import (
 	"fmt"
-	"github.com/qedus/pbf"
+	"github.com/qedus/osmpbf"
 	"io"
 	"os"
 	"testing"
@@ -10,13 +10,14 @@ import (
 )
 
 func TestDecoder(t *testing.T) {
-	f, err := os.Open("planet-latest.osm.pbf")
+	//f, err := os.Open("planet-latest.osm.pbf")
+	f, err := os.Open("greater_london.osm.pbf")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	defer f.Close()
 
-	d := pbf.NewDecoder(f)
+	d := osmpbf.NewDecoder(f)
 	n, w, r := 0, 0, 0
 	count, start := 0, time.Now()
 	now := start
@@ -27,11 +28,11 @@ func TestDecoder(t *testing.T) {
 			t.Fatal(err.Error())
 		} else {
 			switch v := v.(type) {
-			case *pbf.Node:
+			case *osmpbf.Node:
 				n++
-			case *pbf.Way:
+			case *osmpbf.Way:
 				w++
-			case *pbf.Relation:
+			case *osmpbf.Relation:
 				r++
 			default:
 				t.Fatalf("unknwon type %T", v)

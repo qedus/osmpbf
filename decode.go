@@ -1,7 +1,7 @@
 // Package pbf decodes OpenStreetMap pbf files.
 // Use this package by creating a NewDecoder and passing it a PBF file. Use
 // Decode to return Node, Way and Relation structs.
-package pbf
+package osmpbf
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/qedus/pbf/OSMPBF"
+	"github.com/qedus/osmpbf/OSMPBF"
 	"io"
 	"io/ioutil"
 )

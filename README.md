@@ -1,12 +1,12 @@
-pbf
+osmpbf
 ===
 
-Package pbf is used to decode OpenStreetMap pbf files.
+Package osmpbf is used to decode OpenStreetMap pbf files.
 
 ## Installation
 
 ```bash
-$ go get github.com/qedus/pbf
+$ go get github.com/qedus/osmpbf
 ```
 
 ## Usage
@@ -20,7 +20,7 @@ Usage is similar to `json.Decode`.
 	}
 	defer f.Close()
 
-	d := pbf.NewDecoder(f)
+	d := osmpbf.NewDecoder(f)
 	n, w, r := 0, 0 , 0
 	for {
 		if v, err := d.Decode(); err == io.EOF {
@@ -29,13 +29,13 @@ Usage is similar to `json.Decode`.
 			t.Fatal(err.Error())
 		} else {
 			switch v := v.(type) {
-			case *pbf.Node:
+			case *osmpbf.Node:
 				// Process Node v.
 				n++
-			case *pbf.Way:
+			case *osmpbf.Way:
 				// Process Way v.
 				w++
-			case *pbf.Relation:
+			case *osmpbf.Relation:
 				// Process Relation v.
 				r++
 			default:
