@@ -77,7 +77,7 @@ type Decoder struct {
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r, make([]interface{}, 0), 0}
+	return &Decoder{r, make([]interface{}, 0, 8000), 0}
 }
 
 // Decode reads the next object from the input stream and returns either a
