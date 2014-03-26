@@ -304,8 +304,8 @@ func (tu *tagUnpacker) next() map[string]string {
 			break
 		}
 		valID := tu.keysVals[tu.index]
-		key := string(tu.stringTable[keyID])
-		val := string(tu.stringTable[valID])
+		key := tu.stringTable[keyID]
+		val := tu.stringTable[valID]
 		tags[key] = val
 	}
 	return tags
@@ -346,7 +346,7 @@ func extractMembers(stringTable []string, rel *OSMPBF.Relation) []Member {
 		case OSMPBF.Relation_RELATION:
 			memType = RelationType
 		}
-		role := string(stringTable[roleIDs[index]])
+		role := stringTable[roleIDs[index]]
 		members = append(members, Member{memID, memType, role})
 	}
 	return members
