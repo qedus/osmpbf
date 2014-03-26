@@ -47,7 +47,7 @@ type Way struct {
 type Relation struct {
 	ID      int64
 	Tags    map[string]string
-	Members []*Member
+	Members []Member
 
 	// TODO: Add Info
 	// TODO: Add roles_sid
@@ -339,13 +339,13 @@ func (dec *Decoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way) {
 	}
 }
 
-func extractMembers(stringTable [][]byte, rel *OSMPBF.Relation) []*Member {
+func extractMembers(stringTable [][]byte, rel *OSMPBF.Relation) []Member {
 	memIDs := rel.GetMemids()
 	types := rel.GetTypes()
 	roleIDs := rel.GetRolesSid()
 
 	memID := int64(0)
-	members := make([]*Member, 0, len(memIDs))
+	members := make([]Member, 0, len(memIDs))
 	for index := range memIDs {
 		memID = memIDs[index] + memID
 		memType := NodeType
@@ -356,7 +356,7 @@ func extractMembers(stringTable [][]byte, rel *OSMPBF.Relation) []*Member {
 			memType = RelationType
 		}
 		role := string(stringTable[roleIDs[index]])
-		members = append(members, &Member{memID, memType, role})
+		members = append(members, Member{memID, memType, role})
 	}
 	return members
 }
