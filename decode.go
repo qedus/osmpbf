@@ -89,7 +89,7 @@ func (dec *Decoder) Decode() (interface{}, error) {
 	if dec.objectIndex >= len(dec.objectQueue) {
 		dec.objectQueue = dec.objectQueue[:0]
 		dec.objectIndex = 0
-		if err := dec.readNextPrimitiveBlock(); err != nil {
+		if err := dec.readNextFileBlock(); err != nil {
 			return nil, err
 		}
 	}
@@ -98,7 +98,8 @@ func (dec *Decoder) Decode() (interface{}, error) {
 	return dec.objectQueue[dec.objectIndex-1], nil
 }
 
-func (dec *Decoder) readNextPrimitiveBlock() error {
+// readNextFileBlock reads next fileblock (BlobHeader size, BlobHeader and Blob)
+func (dec *Decoder) readNextFileBlock() error {
 	for {
 		blobHeaderSize, err := dec.readBlobHeaderSize()
 		if err != nil {
