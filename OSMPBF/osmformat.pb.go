@@ -286,7 +286,7 @@ func (m *PrimitiveGroup) GetChangesets() []*ChangeSet {
 // index in the table is ALWAYS blank and unused.
 //
 type StringTable struct {
-	S                [][]byte `protobuf:"bytes,1,rep,name=s" json:"s,omitempty"`
+	S                []string `protobuf:"bytes,1,rep,name=s" json:"s,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
 }
 
@@ -294,7 +294,7 @@ func (m *StringTable) Reset()         { *m = StringTable{} }
 func (m *StringTable) String() string { return proto.CompactTextString(m) }
 func (*StringTable) ProtoMessage()    {}
 
-func (m *StringTable) GetS() [][]byte {
+func (m *StringTable) GetS() []string {
 	if m != nil {
 		return m.S
 	}
