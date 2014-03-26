@@ -67,6 +67,8 @@ func TestDecoder(t *testing.T) {
 		},
 	}
 
+	var nc, wc, rc int
+	enc, ewc, erc := 2729006, 459055, 12833
 	d := NewDecoder(f)
 	for {
 		if v, err := d.Decode(); err == io.EOF {
@@ -76,14 +78,17 @@ func TestDecoder(t *testing.T) {
 		} else {
 			switch v := v.(type) {
 			case *Node:
+				nc++
 				if v.ID == en.ID {
 					n = v
 				}
 			case *Way:
+				wc++
 				if v.ID == ew.ID {
 					w = v
 				}
 			case *Relation:
+				rc++
 				if v.ID == er.ID {
 					r = v
 				}
@@ -102,10 +107,17 @@ func TestDecoder(t *testing.T) {
 	if !reflect.DeepEqual(er, r) {
 		t.Errorf("\nExpected: %#v\nActual:   %#v", er, r)
 	}
+	if enc != nc || ewc != wc || erc != rc {
+		t.Errorf("\nExpected %7d nodes, %7d ways, %7d relations\nGot      %7d nodes, %7d ways, %7d relations", enc, ewc, erc, nc, wc, rc)
+	}
 }
 
 func BenchmarkDecoder(b *testing.B) {
-	f, err := os.Open(London)
+	file := os.Getenv("OSMPBF_BENCHMARK_FILE")
+	if file == "" {
+		file = London
+	}
+	f, err := os.Open(file)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -115,7 +127,7 @@ func BenchmarkDecoder(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		f.Seek(0, 0)
 		d := NewDecoder(f)
-		n, w, r, count, start := 0, 0, 0, 0, time.Now()
+		n, w, r, c, start := 0, 0, 0, 0, time.Now()
 		for {
 			if v, err := d.Decode(); err == io.EOF {
 				break
@@ -133,9 +145,10 @@ func BenchmarkDecoder(b *testing.B) {
 					b.Fatalf("unknown type %T", v)
 				}
 			}
-			count++
+			c++
 		}
+
 		b.Logf("Done in %.3f seconds. Total: %d, Nodes: %d, Ways: %d, Relations: %d\n",
-			time.Now().Sub(start).Seconds(), count, n, w, r)
+			time.Now().Sub(start).Seconds(), c, n, w, r)
 	}
 }
