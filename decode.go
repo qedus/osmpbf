@@ -23,11 +23,12 @@ const (
 var (
 	parseCapabilities = map[string]bool{
 		"OsmSchema-V0.6": true,
-		"DenseNodes":     true}
+		"DenseNodes":     true,
+	}
 )
 
 type Node struct {
-	Id   int64
+	ID   int64
 	Lat  float64
 	Lon  float64
 	Tags map[string]string
@@ -113,6 +114,7 @@ func (dec *Decoder) readNextPrimitiveBlock() error {
 		if err != nil {
 			return err
 		}
+
 		switch blobHeader.GetType() {
 		case "OSMHeader":
 			if err := dec.readOSMHeader(blob); err != nil {
