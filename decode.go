@@ -311,16 +311,6 @@ func (tu *tagUnpacker) next() map[string]string {
 	return tags
 }
 
-func extractTags(stringTable [][]byte, keyIDs, valueIDs []uint32) map[string]string {
-	tags := make(map[string]string)
-	for index := range keyIDs {
-		key := string(stringTable[keyIDs[index]])
-		val := string(stringTable[valueIDs[index]])
-		tags[key] = val
-	}
-	return tags
-}
-
 func (dec *Decoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way) {
 	st := pb.GetStringtable().GetS()
 	for _, way := range ways {
