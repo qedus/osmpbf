@@ -2,6 +2,17 @@
 // source: fileformat.proto
 // DO NOT EDIT!
 
+/*
+Package OSMPBF is a generated protocol buffer package.
+
+It is generated from these files:
+	fileformat.proto
+	osmformat.proto
+
+It has these top-level messages:
+	Blob
+	BlobHeader
+*/
 package OSMPBF
 
 import proto "code.google.com/p/goprotobuf/proto"
@@ -14,10 +25,13 @@ var _ = &json.SyntaxError{}
 var _ = math.Inf
 
 type Blob struct {
-	Raw               []byte `protobuf:"bytes,1,opt,name=raw" json:"raw,omitempty"`
-	RawSize           *int32 `protobuf:"varint,2,opt,name=raw_size" json:"raw_size,omitempty"`
-	ZlibData          []byte `protobuf:"bytes,3,opt,name=zlib_data" json:"zlib_data,omitempty"`
-	LzmaData          []byte `protobuf:"bytes,4,opt,name=lzma_data" json:"lzma_data,omitempty"`
+	Raw     []byte `protobuf:"bytes,1,opt,name=raw" json:"raw,omitempty"`
+	RawSize *int32 `protobuf:"varint,2,opt,name=raw_size" json:"raw_size,omitempty"`
+	// Possible compressed versions of the data.
+	ZlibData []byte `protobuf:"bytes,3,opt,name=zlib_data" json:"zlib_data,omitempty"`
+	// PROPOSED feature for LZMA compressed data. SUPPORT IS NOT REQUIRED.
+	LzmaData []byte `protobuf:"bytes,4,opt,name=lzma_data" json:"lzma_data,omitempty"`
+	// Formerly used for bzip2 compressed data. Depreciated in 2010.
 	OBSOLETEBzip2Data []byte `protobuf:"bytes,5,opt,name=OBSOLETE_bzip2_data" json:"OBSOLETE_bzip2_data,omitempty"`
 	XXX_unrecognized  []byte `json:"-"`
 }

@@ -23,11 +23,12 @@ const (
 var (
 	parseCapabilities = map[string]bool{
 		"OsmSchema-V0.6": true,
-		"DenseNodes":     true}
+		"DenseNodes":     true,
+	}
 )
 
 type Node struct {
-	Id   int64
+	ID   int64
 	Lat  float64
 	Lon  float64
 	Tags map[string]string
@@ -46,7 +47,7 @@ type Way struct {
 type Relation struct {
 	ID      int64
 	Tags    map[string]string
-	Members []*Member
+	Members []Member
 
 	// TODO: Add Info
 	// TODO: Add roles_sid
@@ -76,7 +77,7 @@ type Decoder struct {
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r, make([]interface{}, 0), 0}
+	return &Decoder{r, make([]interface{}, 0, 8000), 0}
 }
 
 // Decode reads the next object from the input stream and returns either a
@@ -88,7 +89,7 @@ func (dec *Decoder) Decode() (interface{}, error) {
 	if dec.objectIndex >= len(dec.objectQueue) {
 		dec.objectQueue = dec.objectQueue[:0]
 		dec.objectIndex = 0
-		if err := dec.readNextPrimitiveBlock(); err != nil {
+		if err := dec.readNextFileBlock(); err != nil {
 			return nil, err
 		}
 	}
@@ -97,7 +98,8 @@ func (dec *Decoder) Decode() (interface{}, error) {
 	return dec.objectQueue[dec.objectIndex-1], nil
 }
 
-func (dec *Decoder) readNextPrimitiveBlock() error {
+// readNextFileBlock reads next fileblock (BlobHeader size, BlobHeader and Blob)
+func (dec *Decoder) readNextFileBlock() error {
 	for {
 		blobHeaderSize, err := dec.readBlobHeaderSize()
 		if err != nil {
@@ -113,6 +115,7 @@ func (dec *Decoder) readNextPrimitiveBlock() error {
 		if err != nil {
 			return err
 		}
+
 		switch blobHeader.GetType() {
 		case "OSMHeader":
 			if err := dec.readOSMHeader(blob); err != nil {
@@ -286,7 +289,7 @@ func (dec *Decoder) parseDenseNodes(pb *OSMPBF.PrimitiveBlock, dn *OSMPBF.DenseN
 }
 
 type tagUnpacker struct {
-	stringTable [][]byte
+	stringTable []string
 	keysVals    []int32
 	index       int
 }
@@ -301,18 +304,8 @@ func (tu *tagUnpacker) next() map[string]string {
 			break
 		}
 		valID := tu.keysVals[tu.index]
-		key := string(tu.stringTable[keyID])
-		val := string(tu.stringTable[valID])
-		tags[key] = val
-	}
-	return tags
-}
-
-func extractTags(stringTable [][]byte, keyIDs, valueIDs []uint32) map[string]string {
-	tags := make(map[string]string)
-	for index := range keyIDs {
-		key := string(stringTable[keyIDs[index]])
-		val := string(stringTable[valueIDs[index]])
+		key := tu.stringTable[keyID]
+		val := tu.stringTable[valID]
 		tags[key] = val
 	}
 	return tags
@@ -337,13 +330,13 @@ func (dec *Decoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way) {
 	}
 }
 
-func extractMembers(stringTable [][]byte, rel *OSMPBF.Relation) []*Member {
+func extractMembers(stringTable []string, rel *OSMPBF.Relation) []Member {
 	memIDs := rel.GetMemids()
 	types := rel.GetTypes()
 	roleIDs := rel.GetRolesSid()
 
 	memID := int64(0)
-	members := make([]*Member, 0, len(memIDs))
+	members := make([]Member, 0, len(memIDs))
 	for index := range memIDs {
 		memID = memIDs[index] + memID
 		memType := NodeType
@@ -353,8 +346,8 @@ func extractMembers(stringTable [][]byte, rel *OSMPBF.Relation) []*Member {
 		case OSMPBF.Relation_RELATION:
 			memType = RelationType
 		}
-		role := string(stringTable[roleIDs[index]])
-		members = append(members, &Member{memID, memType, role})
+		role := stringTable[roleIDs[index]]
+		members = append(members, Member{memID, memType, role})
 	}
 	return members
 }
