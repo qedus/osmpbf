@@ -129,7 +129,7 @@ message PrimitiveGroup {
 
  */
 message StringTable {
-   repeated bytes s = 1;
+   repeated string s = 1;
 }
 
 /* Optional metadata that may be included into each primitive. */

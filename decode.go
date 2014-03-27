@@ -289,7 +289,7 @@ func (dec *Decoder) parseDenseNodes(pb *OSMPBF.PrimitiveBlock, dn *OSMPBF.DenseN
 }
 
 type tagUnpacker struct {
-	stringTable [][]byte
+	stringTable []string
 	keysVals    []int32
 	index       int
 }
@@ -304,8 +304,8 @@ func (tu *tagUnpacker) next() map[string]string {
 			break
 		}
 		valID := tu.keysVals[tu.index]
-		key := string(tu.stringTable[keyID])
-		val := string(tu.stringTable[valID])
+		key := tu.stringTable[keyID]
+		val := tu.stringTable[valID]
 		tags[key] = val
 	}
 	return tags
@@ -330,7 +330,7 @@ func (dec *Decoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way) {
 	}
 }
 
-func extractMembers(stringTable [][]byte, rel *OSMPBF.Relation) []Member {
+func extractMembers(stringTable []string, rel *OSMPBF.Relation) []Member {
 	memIDs := rel.GetMemids()
 	types := rel.GetTypes()
 	roleIDs := rel.GetRolesSid()
@@ -346,7 +346,7 @@ func extractMembers(stringTable [][]byte, rel *OSMPBF.Relation) []Member {
 		case OSMPBF.Relation_RELATION:
 			memType = RelationType
 		}
-		role := string(stringTable[roleIDs[index]])
+		role := stringTable[roleIDs[index]]
 		members = append(members, Member{memID, memType, role})
 	}
 	return members
