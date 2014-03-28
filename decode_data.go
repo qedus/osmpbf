@@ -11,12 +11,11 @@ type dataDecoder struct {
 }
 
 func newDataDecoder() *dataDecoder {
-	return &dataDecoder{make([]interface{}, 0, 8000)} // typical PrimitiveBlock contains 8k OSM entities
-
+	return &dataDecoder{}
 }
 
 func (dec *dataDecoder) Decode(blob *OSMPBF.Blob) ([]interface{}, error) {
-	dec.q = dec.q[:0]
+	dec.q = make([]interface{}, 0, 8000) // typical PrimitiveBlock contains 8k OSM entities
 
 	data, err := getData(blob)
 	if err != nil {
