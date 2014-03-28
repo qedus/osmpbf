@@ -60,9 +60,9 @@ func (dec *dataDecoder) parseNodes(pb *OSMPBF.PrimitiveBlock, nodes []*OSMPBF.No
 
 		tags := extractTags(st, node.GetKeys(), node.GetVals())
 
-		panic("Please test this first")
-
 		dec.q = append(dec.q, &Node{id, latitude, longitude, tags})
+
+		panic("Please test this first")
 	}
 
 }
