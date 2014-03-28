@@ -69,15 +69,14 @@ type Member struct {
 
 // A Decoder reads and decodes OpenStreetMap PBF data from an input stream.
 type Decoder struct {
-	r io.Reader
-
-	objectQueue []interface{}
+	r           io.Reader
+	dd          *dataDecoder
 	objectIndex int
 }
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r, make([]interface{}, 0, 8000), 0}
+	return &Decoder{r, newDataDecoder(), 0}
 }
 
 // Decode reads the next object from the input stream and returns either a
@@ -86,8 +85,7 @@ func NewDecoder(r io.Reader) *Decoder {
 //
 // The end of the input stream is reported by an io.EOF error.
 func (dec *Decoder) Decode() (interface{}, error) {
-	if dec.objectIndex >= len(dec.objectQueue) {
-		dec.objectQueue = dec.objectQueue[:0]
+	if dec.objectIndex >= len(dec.dd.objectQueue) {
 		dec.objectIndex = 0
 		if err := dec.readNextFileBlock(); err != nil {
 			return nil, err
@@ -95,7 +93,7 @@ func (dec *Decoder) Decode() (interface{}, error) {
 	}
 
 	dec.objectIndex++
-	return dec.objectQueue[dec.objectIndex-1], nil
+	return dec.dd.objectQueue[dec.objectIndex-1], nil
 }
 
 // readNextFileBlock reads next fileblock (BlobHeader size, BlobHeader and Blob)
@@ -172,6 +170,30 @@ func (dec *Decoder) readBlob(blobHeader *OSMPBF.BlobHeader) (*OSMPBF.Blob, error
 	return blob, nil
 }
 
+func getData(blob *OSMPBF.Blob) ([]byte, error) {
+	switch {
+	case blob.Raw != nil:
+		return blob.GetRaw(), nil
+	case blob.ZlibData != nil:
+		compressedData := bytes.NewBuffer(blob.GetZlibData())
+		r, err := zlib.NewReader(compressedData)
+		if err != nil {
+			return nil, err
+		}
+		data, err := ioutil.ReadAll(r)
+		if err != nil {
+			return nil, err
+		}
+		if len(data) != int(blob.GetRawSize()) {
+			return nil, fmt.Errorf(
+				"raw blob data size %d but expected %d",
+				len(data), blob.GetRawSize())
+		}
+		return data, nil
+	}
+	return nil, errors.New("unknown blob data")
+}
+
 func (dec *Decoder) readOSMHeader(blob *OSMPBF.Blob) error {
 	data, err := getData(blob)
 	if err != nil {
@@ -199,167 +221,6 @@ func (dec *Decoder) readOSMData(blob *OSMPBF.Blob) error {
 		return err
 	}
 
-	primitiveBlock := &OSMPBF.PrimitiveBlock{}
-	if err := proto.Unmarshal(data, primitiveBlock); err != nil {
-		return err
-	}
-	dec.parsePrimitiveBlock(primitiveBlock)
-	return nil
-}
-
-func getData(blob *OSMPBF.Blob) ([]byte, error) {
-	switch {
-	case blob.Raw != nil:
-		return blob.GetRaw(), nil
-	case blob.ZlibData != nil:
-		compressedData := bytes.NewBuffer(blob.GetZlibData())
-		r, err := zlib.NewReader(compressedData)
-		if err != nil {
-			return nil, err
-		}
-		data, err := ioutil.ReadAll(r)
-		if err != nil {
-			return nil, err
-		}
-		if len(data) != int(blob.GetRawSize()) {
-			return nil, fmt.Errorf(
-				"raw blob data size %d but expected %d",
-				len(data), blob.GetRawSize())
-		}
-		return data, nil
-	}
-	return nil, errors.New("unknown blob data")
-}
-
-func (dec *Decoder) parsePrimitiveBlock(pb *OSMPBF.PrimitiveBlock) {
-	primitiveGroups := pb.GetPrimitivegroup()
-	for _, pg := range primitiveGroups {
-		dec.parsePrimitiveGroup(pb, pg)
-	}
-}
-
-func (dec *Decoder) parsePrimitiveGroup(pb *OSMPBF.PrimitiveBlock, pg *OSMPBF.PrimitiveGroup) {
-	dec.parseNodes(pb, pg.GetNodes())
-	dec.parseDenseNodes(pb, pg.GetDense())
-	dec.parseWays(pb, pg.GetWays())
-	dec.parseRelations(pb, pg.GetRelations())
-}
-
-func (dec *Decoder) parseNodes(pb *OSMPBF.PrimitiveBlock, nodes []*OSMPBF.Node) {
-	st := pb.GetStringtable().GetS()
-	granularity := int64(pb.GetGranularity())
-	latOffset := pb.GetLatOffset()
-	lonOffset := pb.GetLonOffset()
-
-	for _, node := range nodes {
-		id := node.GetId()
-		lat := node.GetLat()
-		lon := node.GetLon()
-
-		latitude := 1e-9 * float64((latOffset + (granularity * lat)))
-		longitude := 1e-9 * float64((lonOffset + (granularity * lon)))
-
-		tags := extractTags(st, node.GetKeys(), node.GetVals())
-		dec.objectQueue = append(dec.objectQueue,
-			&Node{id, latitude, longitude, tags})
-		panic("Please test this first")
-	}
-}
-
-func (dec *Decoder) parseDenseNodes(pb *OSMPBF.PrimitiveBlock, dn *OSMPBF.DenseNodes) {
-	st := pb.GetStringtable().GetS()
-	granularity := int64(pb.GetGranularity())
-	latOffset := pb.GetLatOffset()
-	lonOffset := pb.GetLonOffset()
-	ids := dn.GetId()
-	lats := dn.GetLat()
-	lons := dn.GetLon()
-	tu := tagUnpacker{st, dn.GetKeysVals(), 0}
-	id, lat, lon := int64(0), int64(0), int64(0)
-	for index := range ids {
-		id = ids[index] + id
-		lat = lats[index] + lat
-		lon = lons[index] + lon
-		latitude := 1e-9 * float64((latOffset + (granularity * lat)))
-		longitude := 1e-9 * float64((lonOffset + (granularity * lon)))
-		tags := tu.next()
-		dec.objectQueue = append(dec.objectQueue,
-			&Node{id, latitude, longitude, tags})
-	}
-}
-
-type tagUnpacker struct {
-	stringTable []string
-	keysVals    []int32
-	index       int
-}
-
-func (tu *tagUnpacker) next() map[string]string {
-	tags := make(map[string]string)
-	for ; tu.index < len(tu.keysVals); tu.index++ {
-
-		keyID := tu.keysVals[tu.index]
-		tu.index++
-		if keyID == 0 {
-			break
-		}
-		valID := tu.keysVals[tu.index]
-		key := tu.stringTable[keyID]
-		val := tu.stringTable[valID]
-		tags[key] = val
-	}
-	return tags
-}
-
-func (dec *Decoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way) {
-	st := pb.GetStringtable().GetS()
-	for _, way := range ways {
-		id := way.GetId()
-		tags := extractTags(st, way.GetKeys(), way.GetVals())
-
-		// NodeIDs
-		refs := way.GetRefs()
-		nodeID := int64(0)
-		nodeIDs := make([]int64, 0, len(refs))
-		for index := range refs {
-			nodeID = refs[index] + nodeID
-			nodeIDs = append(nodeIDs, nodeID)
-		}
-		dec.objectQueue = append(dec.objectQueue,
-			&Way{id, tags, nodeIDs})
-	}
-}
-
-func extractMembers(stringTable []string, rel *OSMPBF.Relation) []Member {
-	memIDs := rel.GetMemids()
-	types := rel.GetTypes()
-	roleIDs := rel.GetRolesSid()
-
-	memID := int64(0)
-	members := make([]Member, 0, len(memIDs))
-	for index := range memIDs {
-		memID = memIDs[index] + memID
-		memType := NodeType
-		switch types[index] {
-		case OSMPBF.Relation_WAY:
-			memType = WayType
-		case OSMPBF.Relation_RELATION:
-			memType = RelationType
-		}
-		role := stringTable[roleIDs[index]]
-		members = append(members, Member{memID, memType, role})
-	}
-	return members
-}
-
-func (dec *Decoder) parseRelations(pb *OSMPBF.PrimitiveBlock, relations []*OSMPBF.Relation) {
-	st := pb.GetStringtable().GetS()
-	for _, rel := range relations {
-		id := rel.GetId()
-		tags := extractTags(st, rel.GetKeys(), rel.GetVals())
-		members := extractMembers(st, rel)
-
-		dec.objectQueue = append(dec.objectQueue,
-			&Relation{id, tags, members})
-	}
+	err = dec.dd.Decode(data)
+	return err
 }
