@@ -70,12 +70,13 @@ type Member struct {
 type Decoder struct {
 	r           io.Reader
 	dd          *dataDecoder
+	objectQueue []interface{}
 	objectIndex int
 }
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r, newDataDecoder(), 0}
+	return &Decoder{r: r, dd: newDataDecoder()}
 }
 
 // Decode reads the next object from the input stream and returns either a
@@ -84,39 +85,41 @@ func NewDecoder(r io.Reader) *Decoder {
 //
 // The end of the input stream is reported by an io.EOF error.
 func (dec *Decoder) Decode() (interface{}, error) {
-	if dec.objectIndex >= len(dec.dd.objectQueue) {
+	if dec.objectIndex == len(dec.objectQueue) {
+		var err error
 		dec.objectIndex = 0
-		if err := dec.readNextFileBlock(); err != nil {
+		dec.objectQueue, err = dec.readNextFileBlock()
+		if err != nil {
 			return nil, err
 		}
 	}
 
 	dec.objectIndex++
-	return dec.dd.objectQueue[dec.objectIndex-1], nil
+	return dec.objectQueue[dec.objectIndex-1], nil
 }
 
 // readNextFileBlock reads next fileblock (BlobHeader size, BlobHeader and Blob)
-func (dec *Decoder) readNextFileBlock() error {
+func (dec *Decoder) readNextFileBlock() ([]interface{}, error) {
 	for {
 		blobHeaderSize, err := dec.readBlobHeaderSize()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		blobHeader, err := dec.readBlobHeader(blobHeaderSize)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		blob, err := dec.readBlob(blobHeader)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		switch blobHeader.GetType() {
 		case "OSMHeader":
 			if err := dec.readOSMHeader(blob); err != nil {
-				return err
+				return nil, err
 			}
 		case "OSMData":
 			return dec.dd.Decode(blob)

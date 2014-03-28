@@ -7,7 +7,7 @@ import (
 
 // Decoder for Blob with OSMData (PrimitiveBlock)
 type dataDecoder struct {
-	objectQueue []interface{}
+	q []interface{}
 }
 
 func newDataDecoder() *dataDecoder {
@@ -15,21 +15,21 @@ func newDataDecoder() *dataDecoder {
 
 }
 
-func (dec *dataDecoder) Decode(blob *OSMPBF.Blob) error {
-	dec.objectQueue = dec.objectQueue[:0]
+func (dec *dataDecoder) Decode(blob *OSMPBF.Blob) ([]interface{}, error) {
+	dec.q = dec.q[:0]
 
 	data, err := getData(blob)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	primitiveBlock := &OSMPBF.PrimitiveBlock{}
 	if err := proto.Unmarshal(data, primitiveBlock); err != nil {
-		return err
+		return nil, err
 	}
 
 	dec.parsePrimitiveBlock(primitiveBlock)
-	return nil
+	return dec.q, nil
 }
 
 func (dec *dataDecoder) parsePrimitiveBlock(pb *OSMPBF.PrimitiveBlock) {
@@ -63,7 +63,7 @@ func (dec *dataDecoder) parseNodes(pb *OSMPBF.PrimitiveBlock, nodes []*OSMPBF.No
 
 		panic("Please test this first")
 
-		dec.objectQueue = append(dec.objectQueue, &Node{id, latitude, longitude, tags})
+		dec.q = append(dec.q, &Node{id, latitude, longitude, tags})
 	}
 
 }
@@ -86,7 +86,7 @@ func (dec *dataDecoder) parseDenseNodes(pb *OSMPBF.PrimitiveBlock, dn *OSMPBF.De
 		longitude := 1e-9 * float64((lonOffset + (granularity * lon)))
 		tags := tu.next()
 
-		dec.objectQueue = append(dec.objectQueue, &Node{id, latitude, longitude, tags})
+		dec.q = append(dec.q, &Node{id, latitude, longitude, tags})
 	}
 }
 
@@ -105,7 +105,7 @@ func (dec *dataDecoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way)
 			nodeIDs[index] = nodeID
 		}
 
-		dec.objectQueue = append(dec.objectQueue, &Way{id, tags, nodeIDs})
+		dec.q = append(dec.q, &Way{id, tags, nodeIDs})
 	}
 }
 
@@ -145,6 +145,6 @@ func (dec *dataDecoder) parseRelations(pb *OSMPBF.PrimitiveBlock, relations []*O
 		tags := extractTags(st, rel.GetKeys(), rel.GetVals())
 		members := extractMembers(st, rel)
 
-		dec.objectQueue = append(dec.objectQueue, &Relation{id, tags, members})
+		dec.q = append(dec.q, &Relation{id, tags, members})
 	}
 }
