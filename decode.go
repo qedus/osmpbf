@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"github.com/qedus/osmpbf/OSMPBF"
 	"io"
-	"io/ioutil"
 )
 
 const (
@@ -180,15 +179,16 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		data, err := ioutil.ReadAll(r)
+		buf := bytes.NewBuffer(make([]byte, 0, blob.GetRawSize()+bytes.MinRead))
+		_, err = buf.ReadFrom(r)
 		if err != nil {
 			return nil, err
 		}
-		if len(data) != int(blob.GetRawSize()) {
-			err = fmt.Errorf("raw blob data size %d but expected %d", len(data), blob.GetRawSize())
+		if buf.Len() != int(blob.GetRawSize()) {
+			err = fmt.Errorf("raw blob data size %d but expected %d", buf.Len(), blob.GetRawSize())
 			return nil, err
 		}
-		return data, nil
+		return buf.Bytes(), nil
 
 	default:
 		return nil, errors.New("unknown blob data")
@@ -213,5 +213,6 @@ func (dec *Decoder) readOSMHeader(blob *OSMPBF.Blob) error {
 			return fmt.Errorf("parser does not have %s capability", feature)
 		}
 	}
+
 	return nil
 }
