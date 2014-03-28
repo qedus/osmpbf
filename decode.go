@@ -120,7 +120,7 @@ func (dec *Decoder) readNextFileBlock() error {
 				return err
 			}
 		case "OSMData":
-			return dec.readOSMData(blob)
+			return dec.dd.Decode(blob)
 		default:
 			// Skip over unknown type
 		}
@@ -174,9 +174,9 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 	switch {
 	case blob.Raw != nil:
 		return blob.GetRaw(), nil
+
 	case blob.ZlibData != nil:
-		compressedData := bytes.NewBuffer(blob.GetZlibData())
-		r, err := zlib.NewReader(compressedData)
+		r, err := zlib.NewReader(bytes.NewReader(blob.GetZlibData()))
 		if err != nil {
 			return nil, err
 		}
@@ -185,13 +185,14 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 			return nil, err
 		}
 		if len(data) != int(blob.GetRawSize()) {
-			return nil, fmt.Errorf(
-				"raw blob data size %d but expected %d",
-				len(data), blob.GetRawSize())
+			err = fmt.Errorf("raw blob data size %d but expected %d", len(data), blob.GetRawSize())
+			return nil, err
 		}
 		return data, nil
+
+	default:
+		return nil, errors.New("unknown blob data")
 	}
-	return nil, errors.New("unknown blob data")
 }
 
 func (dec *Decoder) readOSMHeader(blob *OSMPBF.Blob) error {
@@ -199,6 +200,7 @@ func (dec *Decoder) readOSMHeader(blob *OSMPBF.Blob) error {
 	if err != nil {
 		return err
 	}
+
 	headerBlock := &OSMPBF.HeaderBlock{}
 	if err := proto.Unmarshal(data, headerBlock); err != nil {
 		return err
@@ -208,19 +210,8 @@ func (dec *Decoder) readOSMHeader(blob *OSMPBF.Blob) error {
 	requiredFeatures := headerBlock.GetRequiredFeatures()
 	for _, feature := range requiredFeatures {
 		if !parseCapabilities[feature] {
-			return fmt.Errorf("parser does not have %s capability",
-				feature)
+			return fmt.Errorf("parser does not have %s capability", feature)
 		}
 	}
 	return nil
-}
-
-func (dec *Decoder) readOSMData(blob *OSMPBF.Blob) error {
-	data, err := getData(blob)
-	if err != nil {
-		return err
-	}
-
-	err = dec.dd.Decode(data)
-	return err
 }

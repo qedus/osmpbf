@@ -7,22 +7,24 @@ import (
 
 // Decoder for Blob with OSMData (PrimitiveBlock)
 type dataDecoder struct {
-	b           []byte
 	objectQueue []interface{}
 }
 
 func newDataDecoder() *dataDecoder {
-	return &dataDecoder{
-		objectQueue: make([]interface{}, 0, 8000), // typical PrimitiveBlock contains 8k OSM entities
-	}
+	return &dataDecoder{make([]interface{}, 0, 8000)} // typical PrimitiveBlock contains 8k OSM entities
+
 }
 
-func (dec *dataDecoder) Decode(b []byte) error {
-	dec.b = b
+func (dec *dataDecoder) Decode(blob *OSMPBF.Blob) error {
 	dec.objectQueue = dec.objectQueue[:0]
 
+	data, err := getData(blob)
+	if err != nil {
+		return err
+	}
+
 	primitiveBlock := &OSMPBF.PrimitiveBlock{}
-	if err := proto.Unmarshal(dec.b, primitiveBlock); err != nil {
+	if err := proto.Unmarshal(data, primitiveBlock); err != nil {
 		return err
 	}
 
