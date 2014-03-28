@@ -69,14 +69,83 @@ type Member struct {
 // A Decoder reads and decodes OpenStreetMap PBF data from an input stream.
 type Decoder struct {
 	r           io.Reader
-	dd          *dataDecoder
+	inputs      []chan<- *OSMPBF.Blob
+	outputs     []<-chan interface{}
+	outputIndex int
+	err         error
 	objectQueue []interface{}
 	objectIndex int
 }
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r: r, dd: newDataDecoder()}
+	return &Decoder{r: r}
+}
+
+// Start decoding process using n goroutines.
+func (dec *Decoder) Start(n int) error {
+	// start data decoders
+	for i := 0; i < n; i++ {
+		input := make(chan *OSMPBF.Blob)
+		output := make(chan interface{})
+		go func() {
+			for blob := range input {
+				objects, err := new(dataDecoder).Decode(blob)
+				if err != nil {
+					output <- err
+				} else {
+					output <- objects
+				}
+			}
+			close(output)
+		}()
+
+		dec.inputs = append(dec.inputs, input)
+		dec.outputs = append(dec.outputs, output)
+	}
+
+	// read OSMHeader
+	blobHeader, blob, err := dec.readFileBlock()
+	if err == nil {
+		if blobHeader.GetType() == "OSMHeader" {
+			err = decodeOSMHeader(blob)
+		} else {
+			err = fmt.Errorf("unexpected first fileblock of type %s", blobHeader.GetType())
+		}
+	}
+	if err != nil {
+		dec.stop()
+		return err
+	}
+
+	// start reading OSMData
+	go func() {
+		var currentInput int
+		for {
+			blobHeader, blob, err = dec.readFileBlock()
+			if err == nil {
+				if blobHeader.GetType() == "OSMData" {
+					dec.inputs[currentInput] <- blob
+					currentInput = (currentInput + 1) % n
+				} else {
+					err = fmt.Errorf("unexpected fileblock of type %s", blobHeader.GetType())
+				}
+			}
+			if err != nil {
+				dec.err = err
+				dec.stop()
+				break
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (dec *Decoder) stop() {
+	for _, input := range dec.inputs {
+		close(input)
+	}
 }
 
 // Decode reads the next object from the input stream and returns either a
@@ -85,48 +154,48 @@ func NewDecoder(r io.Reader) *Decoder {
 //
 // The end of the input stream is reported by an io.EOF error.
 func (dec *Decoder) Decode() (interface{}, error) {
+	// if current queue ended, switch to next
 	if dec.objectIndex == len(dec.objectQueue) {
-		var err error
-		dec.objectIndex = 0
-		dec.objectQueue, err = dec.readNextFileBlock()
-		if err != nil {
-			return nil, err
+		output := dec.outputs[dec.outputIndex]
+		dec.outputIndex = (dec.outputIndex + 1) % len(dec.outputs)
+
+		result, ok := <-output
+		if !ok {
+			return nil, dec.err
+		}
+
+		switch v := (result).(type) {
+		case []interface{}:
+			dec.objectIndex = 0
+			dec.objectQueue = v
+		case error:
+			dec.stop()
+			return nil, v
 		}
 	}
 
+	// return next decoded object from current queue
 	dec.objectIndex++
 	return dec.objectQueue[dec.objectIndex-1], nil
 }
 
-// readNextFileBlock reads next fileblock (BlobHeader size, BlobHeader and Blob)
-func (dec *Decoder) readNextFileBlock() ([]interface{}, error) {
-	for {
-		blobHeaderSize, err := dec.readBlobHeaderSize()
-		if err != nil {
-			return nil, err
-		}
-
-		blobHeader, err := dec.readBlobHeader(blobHeaderSize)
-		if err != nil {
-			return nil, err
-		}
-
-		blob, err := dec.readBlob(blobHeader)
-		if err != nil {
-			return nil, err
-		}
-
-		switch blobHeader.GetType() {
-		case "OSMHeader":
-			if err := dec.readOSMHeader(blob); err != nil {
-				return nil, err
-			}
-		case "OSMData":
-			return dec.dd.Decode(blob)
-		default:
-			// Skip over unknown type
-		}
+func (dec *Decoder) readFileBlock() (*OSMPBF.BlobHeader, *OSMPBF.Blob, error) {
+	blobHeaderSize, err := dec.readBlobHeaderSize()
+	if err != nil {
+		return nil, nil, err
 	}
+
+	blobHeader, err := dec.readBlobHeader(blobHeaderSize)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	blob, err := dec.readBlob(blobHeader)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return blobHeader, blob, err
 }
 
 func (dec *Decoder) readBlobHeaderSize() (uint32, error) {
@@ -148,7 +217,7 @@ func (dec *Decoder) readBlobHeader(size uint32) (*OSMPBF.BlobHeader, error) {
 		return nil, err
 	}
 
-	blobHeader := &OSMPBF.BlobHeader{}
+	blobHeader := new(OSMPBF.BlobHeader)
 	if err := proto.Unmarshal(buf, blobHeader); err != nil {
 		return nil, err
 	}
@@ -165,7 +234,7 @@ func (dec *Decoder) readBlob(blobHeader *OSMPBF.BlobHeader) (*OSMPBF.Blob, error
 		return nil, err
 	}
 
-	blob := &OSMPBF.Blob{}
+	blob := new(OSMPBF.Blob)
 	if err := proto.Unmarshal(buf, blob); err != nil {
 		return nil, err
 	}
@@ -198,13 +267,13 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 	}
 }
 
-func (dec *Decoder) readOSMHeader(blob *OSMPBF.Blob) error {
+func decodeOSMHeader(blob *OSMPBF.Blob) error {
 	data, err := getData(blob)
 	if err != nil {
 		return err
 	}
 
-	headerBlock := &OSMPBF.HeaderBlock{}
+	headerBlock := new(OSMPBF.HeaderBlock)
 	if err := proto.Unmarshal(data, headerBlock); err != nil {
 		return err
 	}

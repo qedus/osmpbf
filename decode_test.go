@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -15,10 +16,29 @@ const (
 	LondonURL = "https://googledrive.com/host/0B8pisLiGtmqDR3dOR3hrWUpRTVE"
 )
 
+var (
+	IDsExpectedOrder = []string{
+		"node/44", "node/47", "node/52", "node/58", "node/60", // start of dense nodes
+		"node/79",                                                                                     // just because way/79 is already there
+		"node/2740703694", "node/2740703695", "node/2740703697", "node/2740703699", "node/2740703701", // end of dense nodes
+		"way/73", "way/74", "way/75", "way/79", "way/482", // start of ways
+		"way/268745428", "way/268745431", "way/268745434", "way/268745436", "way/268745439", // end of ways
+		"relation/69", "relation/94", "relation/152", "relation/245", "relation/332", // start of relations
+		"relation/3593436", "relation/3595575", "relation/3595798", "relation/3599126", "relation/3599127", // end of relations
+	}
+
+	IDs map[string]bool
+)
+
 func init() {
 	_, err := os.Stat(London)
 	if os.IsNotExist(err) {
 		panic(fmt.Sprintf("\nDownload %s from %s.\nFor example: 'wget -O %s %s'", London, LondonURL, London, LondonURL))
+	}
+
+	IDs = make(map[string]bool)
+	for _, id := range IDsExpectedOrder {
+		IDs[id] = false
 	}
 }
 
@@ -67,25 +87,12 @@ func TestDecoder(t *testing.T) {
 		},
 	}
 
-	idsExpectedOrder := []string{
-		"node/44", "node/47", "node/52", "node/58", "node/60", // start of dense nodes
-		"node/79",                                                                                     // just because way/79 is already there
-		"node/2740703694", "node/2740703695", "node/2740703697", "node/2740703699", "node/2740703701", // end of dense nodes
-		"way/73", "way/74", "way/75", "way/79", "way/482", // start of ways
-		"way/268745428", "way/268745431", "way/268745434", "way/268745436", "way/268745439", // end of ways
-		"relation/69", "relation/94", "relation/152", "relation/245", "relation/332", // start of relations
-		"relation/3593436", "relation/3595575", "relation/3595798", "relation/3599126", "relation/3599127", // end of relations
-	}
-	ids := make(map[string]bool)
-	for _, id := range idsExpectedOrder {
-		ids[id] = true
-	}
-
 	var nc, wc, rc int
 	var id string
 	enc, ewc, erc := 2729006, 459055, 12833
-	idsOrder := make([]string, 0, len(idsExpectedOrder))
+	idsOrder := make([]string, 0, len(IDsExpectedOrder))
 	d := NewDecoder(f)
+	d.Start(runtime.GOMAXPROCS(-1))
 	for {
 		if v, err := d.Decode(); err == io.EOF {
 			break
@@ -99,7 +106,7 @@ func TestDecoder(t *testing.T) {
 					n = v
 				}
 				id = fmt.Sprintf("node/%d", v.ID)
-				if ids[id] {
+				if _, ok := IDs[id]; ok {
 					idsOrder = append(idsOrder, id)
 				}
 			case *Way:
@@ -108,7 +115,7 @@ func TestDecoder(t *testing.T) {
 					w = v
 				}
 				id = fmt.Sprintf("way/%d", v.ID)
-				if ids[id] {
+				if _, ok := IDs[id]; ok {
 					idsOrder = append(idsOrder, id)
 				}
 			case *Relation:
@@ -117,7 +124,7 @@ func TestDecoder(t *testing.T) {
 					r = v
 				}
 				id = fmt.Sprintf("relation/%d", v.ID)
-				if ids[id] {
+				if _, ok := IDs[id]; ok {
 					idsOrder = append(idsOrder, id)
 				}
 			default:
@@ -138,8 +145,8 @@ func TestDecoder(t *testing.T) {
 	if enc != nc || ewc != wc || erc != rc {
 		t.Errorf("\nExpected %7d nodes, %7d ways, %7d relations\nGot      %7d nodes, %7d ways, %7d relations", enc, ewc, erc, nc, wc, rc)
 	}
-	if !reflect.DeepEqual(idsExpectedOrder, idsOrder) {
-		t.Errorf("\nExpected: %v\nGot:      %v", idsExpectedOrder, idsOrder)
+	if !reflect.DeepEqual(IDsExpectedOrder, idsOrder) {
+		t.Errorf("\nExpected: %v\nGot:      %v", IDsExpectedOrder, idsOrder)
 	}
 }
 
@@ -158,6 +165,7 @@ func BenchmarkDecoder(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		f.Seek(0, 0)
 		d := NewDecoder(f)
+		d.Start(runtime.GOMAXPROCS(-1))
 		n, w, r, c, start := 0, 0, 0, 0, time.Now()
 		for {
 			if v, err := d.Decode(); err == io.EOF {

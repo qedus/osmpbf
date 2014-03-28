@@ -10,10 +10,6 @@ type dataDecoder struct {
 	q []interface{}
 }
 
-func newDataDecoder() *dataDecoder {
-	return &dataDecoder{}
-}
-
 func (dec *dataDecoder) Decode(blob *OSMPBF.Blob) ([]interface{}, error) {
 	dec.q = make([]interface{}, 0, 8000) // typical PrimitiveBlock contains 8k OSM entities
 
