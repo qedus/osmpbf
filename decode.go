@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"github.com/qedus/osmpbf/OSMPBF"
 	"io"
-	"io/ioutil"
 )
 
 const (
@@ -69,15 +68,84 @@ type Member struct {
 
 // A Decoder reads and decodes OpenStreetMap PBF data from an input stream.
 type Decoder struct {
-	r io.Reader
-
+	r           io.Reader
+	inputs      []chan<- *OSMPBF.Blob
+	outputs     []<-chan interface{}
+	outputIndex int
+	err         error
 	objectQueue []interface{}
 	objectIndex int
 }
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r, make([]interface{}, 0, 8000), 0}
+	return &Decoder{r: r}
+}
+
+// Start decoding process using n goroutines.
+func (dec *Decoder) Start(n int) error {
+	// start data decoders
+	for i := 0; i < n; i++ {
+		input := make(chan *OSMPBF.Blob)
+		output := make(chan interface{})
+		go func() {
+			for blob := range input {
+				objects, err := new(dataDecoder).Decode(blob)
+				if err != nil {
+					output <- err
+				} else {
+					output <- objects
+				}
+			}
+			close(output)
+		}()
+
+		dec.inputs = append(dec.inputs, input)
+		dec.outputs = append(dec.outputs, output)
+	}
+
+	// read OSMHeader
+	blobHeader, blob, err := dec.readFileBlock()
+	if err == nil {
+		if blobHeader.GetType() == "OSMHeader" {
+			err = decodeOSMHeader(blob)
+		} else {
+			err = fmt.Errorf("unexpected first fileblock of type %s", blobHeader.GetType())
+		}
+	}
+	if err != nil {
+		dec.stop()
+		return err
+	}
+
+	// start reading OSMData
+	go func() {
+		var currentInput int
+		for {
+			blobHeader, blob, err = dec.readFileBlock()
+			if err == nil {
+				if blobHeader.GetType() == "OSMData" {
+					dec.inputs[currentInput] <- blob
+					currentInput = (currentInput + 1) % n
+				} else {
+					err = fmt.Errorf("unexpected fileblock of type %s", blobHeader.GetType())
+				}
+			}
+			if err != nil {
+				dec.err = err
+				dec.stop()
+				break
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (dec *Decoder) stop() {
+	for _, input := range dec.inputs {
+		close(input)
+	}
 }
 
 // Decode reads the next object from the input stream and returns either a
@@ -86,47 +154,48 @@ func NewDecoder(r io.Reader) *Decoder {
 //
 // The end of the input stream is reported by an io.EOF error.
 func (dec *Decoder) Decode() (interface{}, error) {
-	if dec.objectIndex >= len(dec.objectQueue) {
-		dec.objectQueue = dec.objectQueue[:0]
-		dec.objectIndex = 0
-		if err := dec.readNextFileBlock(); err != nil {
-			return nil, err
+	// if current queue ended, switch to next
+	if dec.objectIndex == len(dec.objectQueue) {
+		output := dec.outputs[dec.outputIndex]
+		dec.outputIndex = (dec.outputIndex + 1) % len(dec.outputs)
+
+		result, ok := <-output
+		if !ok {
+			return nil, dec.err
+		}
+
+		switch v := (result).(type) {
+		case []interface{}:
+			dec.objectIndex = 0
+			dec.objectQueue = v
+		case error:
+			dec.stop()
+			return nil, v
 		}
 	}
 
+	// return next decoded object from current queue
 	dec.objectIndex++
 	return dec.objectQueue[dec.objectIndex-1], nil
 }
 
-// readNextFileBlock reads next fileblock (BlobHeader size, BlobHeader and Blob)
-func (dec *Decoder) readNextFileBlock() error {
-	for {
-		blobHeaderSize, err := dec.readBlobHeaderSize()
-		if err != nil {
-			return err
-		}
-
-		blobHeader, err := dec.readBlobHeader(blobHeaderSize)
-		if err != nil {
-			return err
-		}
-
-		blob, err := dec.readBlob(blobHeader)
-		if err != nil {
-			return err
-		}
-
-		switch blobHeader.GetType() {
-		case "OSMHeader":
-			if err := dec.readOSMHeader(blob); err != nil {
-				return err
-			}
-		case "OSMData":
-			return dec.readOSMData(blob)
-		default:
-			// Skip over unknown type
-		}
+func (dec *Decoder) readFileBlock() (*OSMPBF.BlobHeader, *OSMPBF.Blob, error) {
+	blobHeaderSize, err := dec.readBlobHeaderSize()
+	if err != nil {
+		return nil, nil, err
 	}
+
+	blobHeader, err := dec.readBlobHeader(blobHeaderSize)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	blob, err := dec.readBlob(blobHeader)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return blobHeader, blob, err
 }
 
 func (dec *Decoder) readBlobHeaderSize() (uint32, error) {
@@ -148,7 +217,7 @@ func (dec *Decoder) readBlobHeader(size uint32) (*OSMPBF.BlobHeader, error) {
 		return nil, err
 	}
 
-	blobHeader := &OSMPBF.BlobHeader{}
+	blobHeader := new(OSMPBF.BlobHeader)
 	if err := proto.Unmarshal(buf, blobHeader); err != nil {
 		return nil, err
 	}
@@ -165,19 +234,46 @@ func (dec *Decoder) readBlob(blobHeader *OSMPBF.BlobHeader) (*OSMPBF.Blob, error
 		return nil, err
 	}
 
-	blob := &OSMPBF.Blob{}
+	blob := new(OSMPBF.Blob)
 	if err := proto.Unmarshal(buf, blob); err != nil {
 		return nil, err
 	}
 	return blob, nil
 }
 
-func (dec *Decoder) readOSMHeader(blob *OSMPBF.Blob) error {
+func getData(blob *OSMPBF.Blob) ([]byte, error) {
+	switch {
+	case blob.Raw != nil:
+		return blob.GetRaw(), nil
+
+	case blob.ZlibData != nil:
+		r, err := zlib.NewReader(bytes.NewReader(blob.GetZlibData()))
+		if err != nil {
+			return nil, err
+		}
+		buf := bytes.NewBuffer(make([]byte, 0, blob.GetRawSize()+bytes.MinRead))
+		_, err = buf.ReadFrom(r)
+		if err != nil {
+			return nil, err
+		}
+		if buf.Len() != int(blob.GetRawSize()) {
+			err = fmt.Errorf("raw blob data size %d but expected %d", buf.Len(), blob.GetRawSize())
+			return nil, err
+		}
+		return buf.Bytes(), nil
+
+	default:
+		return nil, errors.New("unknown blob data")
+	}
+}
+
+func decodeOSMHeader(blob *OSMPBF.Blob) error {
 	data, err := getData(blob)
 	if err != nil {
 		return err
 	}
-	headerBlock := &OSMPBF.HeaderBlock{}
+
+	headerBlock := new(OSMPBF.HeaderBlock)
 	if err := proto.Unmarshal(data, headerBlock); err != nil {
 		return err
 	}
@@ -186,180 +282,9 @@ func (dec *Decoder) readOSMHeader(blob *OSMPBF.Blob) error {
 	requiredFeatures := headerBlock.GetRequiredFeatures()
 	for _, feature := range requiredFeatures {
 		if !parseCapabilities[feature] {
-			return fmt.Errorf("parser does not have %s capability",
-				feature)
+			return fmt.Errorf("parser does not have %s capability", feature)
 		}
 	}
+
 	return nil
-}
-
-func (dec *Decoder) readOSMData(blob *OSMPBF.Blob) error {
-	data, err := getData(blob)
-	if err != nil {
-		return err
-	}
-
-	primitiveBlock := &OSMPBF.PrimitiveBlock{}
-	if err := proto.Unmarshal(data, primitiveBlock); err != nil {
-		return err
-	}
-	dec.parsePrimitiveBlock(primitiveBlock)
-	return nil
-}
-
-func getData(blob *OSMPBF.Blob) ([]byte, error) {
-	switch {
-	case blob.Raw != nil:
-		return blob.GetRaw(), nil
-	case blob.ZlibData != nil:
-		compressedData := bytes.NewBuffer(blob.GetZlibData())
-		r, err := zlib.NewReader(compressedData)
-		if err != nil {
-			return nil, err
-		}
-		data, err := ioutil.ReadAll(r)
-		if err != nil {
-			return nil, err
-		}
-		if len(data) != int(blob.GetRawSize()) {
-			return nil, fmt.Errorf(
-				"raw blob data size %d but expected %d",
-				len(data), blob.GetRawSize())
-		}
-		return data, nil
-	}
-	return nil, errors.New("unknown blob data")
-}
-
-func (dec *Decoder) parsePrimitiveBlock(pb *OSMPBF.PrimitiveBlock) {
-	primitiveGroups := pb.GetPrimitivegroup()
-	for _, pg := range primitiveGroups {
-		dec.parsePrimitiveGroup(pb, pg)
-	}
-}
-
-func (dec *Decoder) parsePrimitiveGroup(pb *OSMPBF.PrimitiveBlock, pg *OSMPBF.PrimitiveGroup) {
-	dec.parseNodes(pb, pg.GetNodes())
-	dec.parseDenseNodes(pb, pg.GetDense())
-	dec.parseWays(pb, pg.GetWays())
-	dec.parseRelations(pb, pg.GetRelations())
-}
-
-func (dec *Decoder) parseNodes(pb *OSMPBF.PrimitiveBlock, nodes []*OSMPBF.Node) {
-	st := pb.GetStringtable().GetS()
-	granularity := int64(pb.GetGranularity())
-	latOffset := pb.GetLatOffset()
-	lonOffset := pb.GetLonOffset()
-
-	for _, node := range nodes {
-		id := node.GetId()
-		lat := node.GetLat()
-		lon := node.GetLon()
-
-		latitude := 1e-9 * float64((latOffset + (granularity * lat)))
-		longitude := 1e-9 * float64((lonOffset + (granularity * lon)))
-
-		tags := extractTags(st, node.GetKeys(), node.GetVals())
-		dec.objectQueue = append(dec.objectQueue,
-			&Node{id, latitude, longitude, tags})
-		panic("Please test this first")
-	}
-}
-
-func (dec *Decoder) parseDenseNodes(pb *OSMPBF.PrimitiveBlock, dn *OSMPBF.DenseNodes) {
-	st := pb.GetStringtable().GetS()
-	granularity := int64(pb.GetGranularity())
-	latOffset := pb.GetLatOffset()
-	lonOffset := pb.GetLonOffset()
-	ids := dn.GetId()
-	lats := dn.GetLat()
-	lons := dn.GetLon()
-	tu := tagUnpacker{st, dn.GetKeysVals(), 0}
-	id, lat, lon := int64(0), int64(0), int64(0)
-	for index := range ids {
-		id = ids[index] + id
-		lat = lats[index] + lat
-		lon = lons[index] + lon
-		latitude := 1e-9 * float64((latOffset + (granularity * lat)))
-		longitude := 1e-9 * float64((lonOffset + (granularity * lon)))
-		tags := tu.next()
-		dec.objectQueue = append(dec.objectQueue,
-			&Node{id, latitude, longitude, tags})
-	}
-}
-
-type tagUnpacker struct {
-	stringTable []string
-	keysVals    []int32
-	index       int
-}
-
-func (tu *tagUnpacker) next() map[string]string {
-	tags := make(map[string]string)
-	for ; tu.index < len(tu.keysVals); tu.index++ {
-
-		keyID := tu.keysVals[tu.index]
-		tu.index++
-		if keyID == 0 {
-			break
-		}
-		valID := tu.keysVals[tu.index]
-		key := tu.stringTable[keyID]
-		val := tu.stringTable[valID]
-		tags[key] = val
-	}
-	return tags
-}
-
-func (dec *Decoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way) {
-	st := pb.GetStringtable().GetS()
-	for _, way := range ways {
-		id := way.GetId()
-		tags := extractTags(st, way.GetKeys(), way.GetVals())
-
-		// NodeIDs
-		refs := way.GetRefs()
-		nodeID := int64(0)
-		nodeIDs := make([]int64, 0, len(refs))
-		for index := range refs {
-			nodeID = refs[index] + nodeID
-			nodeIDs = append(nodeIDs, nodeID)
-		}
-		dec.objectQueue = append(dec.objectQueue,
-			&Way{id, tags, nodeIDs})
-	}
-}
-
-func extractMembers(stringTable []string, rel *OSMPBF.Relation) []Member {
-	memIDs := rel.GetMemids()
-	types := rel.GetTypes()
-	roleIDs := rel.GetRolesSid()
-
-	memID := int64(0)
-	members := make([]Member, 0, len(memIDs))
-	for index := range memIDs {
-		memID = memIDs[index] + memID
-		memType := NodeType
-		switch types[index] {
-		case OSMPBF.Relation_WAY:
-			memType = WayType
-		case OSMPBF.Relation_RELATION:
-			memType = RelationType
-		}
-		role := stringTable[roleIDs[index]]
-		members = append(members, Member{memID, memType, role})
-	}
-	return members
-}
-
-func (dec *Decoder) parseRelations(pb *OSMPBF.PrimitiveBlock, relations []*OSMPBF.Relation) {
-	st := pb.GetStringtable().GetS()
-	for _, rel := range relations {
-		id := rel.GetId()
-		tags := extractTags(st, rel.GetKeys(), rel.GetVals())
-		members := extractMembers(st, rel)
-
-		dec.objectQueue = append(dec.objectQueue,
-			&Relation{id, tags, members})
-	}
 }
