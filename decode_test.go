@@ -274,3 +274,60 @@ func BenchmarkDecode(b *testing.B) {
 			time.Now().Sub(start).Seconds(), nc, wc, rc)
 	}
 }
+
+func BenchmarkDecodeConcurrent(b *testing.B) {
+	file := os.Getenv("OSMPBF_BENCHMARK_FILE")
+	if file == "" {
+		file = London
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer f.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f.Seek(0, 0)
+
+		d := NewDecoder(f)
+		err = d.Start(runtime.GOMAXPROCS(-1))
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		var nc, wc, rc uint64
+		start := time.Now()
+		var wg sync.WaitGroup
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+
+			go func() {
+				for {
+					if v, err := d.Decode(); err == io.EOF {
+						break
+					} else if err != nil {
+						b.Fatal(err)
+					} else {
+						switch v := v.(type) {
+						case *Node:
+							atomic.AddUint64(&nc, 1)
+						case *Way:
+							atomic.AddUint64(&wc, 1)
+						case *Relation:
+							atomic.AddUint64(&rc, 1)
+						default:
+							b.Fatalf("unknown type %T", v)
+						}
+					}
+				}
+
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+
+		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
+			time.Now().Sub(start).Seconds(), nc, wc, rc)
+	}
+}
