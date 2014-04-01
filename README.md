@@ -26,7 +26,7 @@ Usage is similar to `json.Decode`.
 		log.Fatal(err)
 	}
 
-	n, w, r := 0, 0, 0
+	var nc, wc, rc uint64
 	for {
 		if v, err := d.Decode(); err == io.EOF {
 			break
@@ -36,20 +36,20 @@ Usage is similar to `json.Decode`.
 			switch v := v.(type) {
 			case *osmpbf.Node:
 				// Process Node v.
-				n++
+				nc++
 			case *osmpbf.Way:
 				// Process Way v.
-				w++
+				wc++
 			case *osmpbf.Relation:
 				// Process Relation v.
-				r++
+				rc++
 			default:
 				log.Fatalf("unknown type %T\n", v)
 			}
 		}
 	}
 
-	fmt.Printf("Nodes: %d, Ways: %d, Relations: %d\n", n, w, r)
+	fmt.Printf("Nodes: %d, Ways: %d, Relations: %d\n", nc, wc, rc)
 ```
 
 ## Performance

@@ -90,17 +90,18 @@ func TestDecode(t *testing.T) {
 	}
 	defer f.Close()
 
+	d := NewDecoder(f)
+	err = d.Start(runtime.GOMAXPROCS(-1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	var n *Node
 	var w *Way
 	var r *Relation
 	var nc, wc, rc uint64
 	var id string
 	idsOrder := make([]string, 0, len(IDsExpectedOrder))
-	d := NewDecoder(f)
-	err = d.Start(runtime.GOMAXPROCS(-1))
-	if err != nil {
-		t.Fatal(err)
-	}
 	for {
 		if v, err := d.Decode(); err == io.EOF {
 			break
@@ -165,16 +166,16 @@ func TestDecodeConcurrent(t *testing.T) {
 	}
 	defer f.Close()
 
-	var n *Node
-	var w *Way
-	var r *Relation
-	var nc, wc, rc uint64
 	d := NewDecoder(f)
 	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	var n *Node
+	var w *Way
+	var r *Relation
+	var nc, wc, rc uint64
 	var wg sync.WaitGroup
 	for i := 0; i < 4; i++ {
 		wg.Add(1)
@@ -227,7 +228,7 @@ func TestDecodeConcurrent(t *testing.T) {
 	}
 }
 
-func BenchmarkDecoder(b *testing.B) {
+func BenchmarkDecode(b *testing.B) {
 	file := os.Getenv("OSMPBF_BENCHMARK_FILE")
 	if file == "" {
 		file = London
@@ -241,12 +242,15 @@ func BenchmarkDecoder(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		f.Seek(0, 0)
+
 		d := NewDecoder(f)
 		err = d.Start(runtime.GOMAXPROCS(-1))
 		if err != nil {
 			b.Fatal(err)
 		}
-		n, w, r, c, start := 0, 0, 0, 0, time.Now()
+
+		var nc, wc, rc uint64
+		start := time.Now()
 		for {
 			if v, err := d.Decode(); err == io.EOF {
 				break
@@ -255,19 +259,18 @@ func BenchmarkDecoder(b *testing.B) {
 			} else {
 				switch v := v.(type) {
 				case *Node:
-					n++
+					nc++
 				case *Way:
-					w++
+					wc++
 				case *Relation:
-					r++
+					rc++
 				default:
 					b.Fatalf("unknown type %T", v)
 				}
 			}
-			c++
 		}
 
-		b.Logf("Done in %.3f seconds. Total: %d, Nodes: %d, Ways: %d, Relations: %d\n",
-			time.Now().Sub(start).Seconds(), c, n, w, r)
+		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
+			time.Now().Sub(start).Seconds(), nc, wc, rc)
 	}
 }
