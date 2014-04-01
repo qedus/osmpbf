@@ -92,7 +92,10 @@ func TestDecoder(t *testing.T) {
 	enc, ewc, erc := 2729006, 459055, 12833
 	idsOrder := make([]string, 0, len(IDsExpectedOrder))
 	d := NewDecoder(f)
-	d.Start(runtime.GOMAXPROCS(-1))
+	err = d.Start(runtime.GOMAXPROCS(-1))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for {
 		if v, err := d.Decode(); err == io.EOF {
 			break
@@ -165,7 +168,10 @@ func BenchmarkDecoder(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		f.Seek(0, 0)
 		d := NewDecoder(f)
-		d.Start(runtime.GOMAXPROCS(-1))
+		err = d.Start(runtime.GOMAXPROCS(-1))
+		if err != nil {
+			b.Fatal(err)
+		}
 		n, w, r, c, start := 0, 0, 0, 0, time.Now()
 		for {
 			if v, err := d.Decode(); err == io.EOF {
