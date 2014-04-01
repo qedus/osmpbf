@@ -6,6 +6,8 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -153,6 +155,75 @@ func TestDecode(t *testing.T) {
 	}
 	if !reflect.DeepEqual(IDsExpectedOrder, idsOrder) {
 		t.Errorf("\nExpected: %v\nGot:      %v", IDsExpectedOrder, idsOrder)
+	}
+}
+
+func TestDecodeConcurrent(t *testing.T) {
+	f, err := os.Open(London)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	var n *Node
+	var w *Way
+	var r *Relation
+	var nc, wc, rc uint64
+	d := NewDecoder(f)
+	err = d.Start(runtime.GOMAXPROCS(-1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+
+		go func() {
+			for {
+				if v, err := d.Decode(); err == io.EOF {
+					break
+				} else if err != nil {
+					t.Fatal(err)
+				} else {
+					switch v := v.(type) {
+					case *Node:
+						atomic.AddUint64(&nc, 1)
+						if v.ID == en.ID {
+							n = v
+						}
+					case *Way:
+						atomic.AddUint64(&wc, 1)
+						if v.ID == ew.ID {
+							w = v
+						}
+					case *Relation:
+						atomic.AddUint64(&rc, 1)
+						if v.ID == er.ID {
+							r = v
+						}
+					default:
+						t.Fatalf("unknown type %T", v)
+					}
+				}
+			}
+
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	if !reflect.DeepEqual(en, n) {
+		t.Errorf("\nExpected: %#v\nActual:   %#v", en, n)
+	}
+	if !reflect.DeepEqual(ew, w) {
+		t.Errorf("\nExpected: %#v\nActual:   %#v", ew, w)
+	}
+	if !reflect.DeepEqual(er, r) {
+		t.Errorf("\nExpected: %#v\nActual:   %#v", er, r)
+	}
+	if enc != nc || ewc != wc || erc != rc {
+		t.Errorf("\nExpected %7d nodes, %7d ways, %7d relations\nGot      %7d nodes, %7d ways, %7d relations", enc, ewc, erc, nc, wc, rc)
 	}
 }
 

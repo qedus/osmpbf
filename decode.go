@@ -66,44 +66,31 @@ type Member struct {
 	Role string
 }
 
+type pair struct {
+	i interface{}
+	e error
+}
+
 // A Decoder reads and decodes OpenStreetMap PBF data from an input stream.
 type Decoder struct {
-	r           io.Reader
-	inputs      []chan<- *OSMPBF.Blob
-	outputs     []<-chan interface{}
-	outputIndex int
-	err         error
-	objectQueue []interface{}
-	objectIndex int
+	r          io.Reader
+	serializer chan pair
+
+	// for data decoders
+	inputs  []chan<- pair
+	outputs []<-chan pair
 }
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r: r}
+	return &Decoder{
+		r:          r,
+		serializer: make(chan pair, 8000), // typical PrimitiveBlock contains 8k OSM entities
+	}
 }
 
 // Start decoding process using n goroutines.
 func (dec *Decoder) Start(n int) error {
-	// start data decoders
-	for i := 0; i < n; i++ {
-		input := make(chan *OSMPBF.Blob)
-		output := make(chan interface{})
-		go func() {
-			for blob := range input {
-				objects, err := new(dataDecoder).Decode(blob)
-				if err != nil {
-					output <- err
-				} else {
-					output <- objects
-				}
-			}
-			close(output)
-		}()
-
-		dec.inputs = append(dec.inputs, input)
-		dec.outputs = append(dec.outputs, output)
-	}
-
 	// read OSMHeader
 	blobHeader, blob, err := dec.readFileBlock()
 	if err == nil {
@@ -114,27 +101,75 @@ func (dec *Decoder) Start(n int) error {
 		}
 	}
 	if err != nil {
-		dec.stop()
 		return err
+	}
+
+	// start data decoders
+	for i := 0; i < n; i++ {
+		input := make(chan pair)
+		output := make(chan pair)
+		go func() {
+			dd := new(dataDecoder)
+			for p := range input {
+				if p.e == nil {
+					// send decoded objects or decoding error
+					objects, err := dd.Decode(p.i.(*OSMPBF.Blob))
+					output <- pair{objects, err}
+				} else {
+					// send input error as is
+					output <- pair{nil, p.e}
+				}
+			}
+			close(output)
+		}()
+
+		dec.inputs = append(dec.inputs, input)
+		dec.outputs = append(dec.outputs, output)
 	}
 
 	// start reading OSMData
 	go func() {
-		var currentInput int
+		var inputIndex int
 		for {
+			input := dec.inputs[inputIndex]
+			inputIndex = (inputIndex + 1) % n
+
 			blobHeader, blob, err = dec.readFileBlock()
+			if err == nil && blobHeader.GetType() != "OSMData" {
+				err = fmt.Errorf("unexpected fileblock of type %s", blobHeader.GetType())
+			}
 			if err == nil {
-				if blobHeader.GetType() == "OSMData" {
-					dec.inputs[currentInput] <- blob
-					currentInput = (currentInput + 1) % n
-				} else {
-					err = fmt.Errorf("unexpected fileblock of type %s", blobHeader.GetType())
+				// send blob for decoding
+				input <- pair{blob, nil}
+			} else {
+				// send input error as is
+				input <- pair{nil, err}
+				for _, input := range dec.inputs {
+					close(input)
+				}
+				return
+			}
+		}
+	}()
+
+	go func() {
+		var outputIndex int
+		for {
+			output := dec.outputs[outputIndex]
+			outputIndex = (outputIndex + 1) % n
+
+			p := <-output
+			if p.i != nil {
+				// send decoded objects one by one
+				for _, o := range p.i.([]interface{}) {
+					dec.serializer <- pair{o, nil}
 				}
 			}
-			if err != nil {
-				dec.err = err
-				dec.stop()
-				break
+			if p.e != nil {
+				// send input or decoding error
+				dec.serializer <- pair{nil, p.e}
+				close(dec.serializer)
+				return
 			}
 		}
 	}()
@@ -142,41 +177,18 @@ func (dec *Decoder) Start(n int) error {
 	return nil
 }
 
-func (dec *Decoder) stop() {
-	for _, input := range dec.inputs {
-		close(input)
-	}
-}
-
 // Decode reads the next object from the input stream and returns either a
 // Node, Way or Relation struct representing the underlying OpenStreetMap PBF
-// data.
+// data, or error encountered. The end of the input stream is reported by an io.EOF error.
 //
-// The end of the input stream is reported by an io.EOF error.
+// Decode is safe for parallel execution. Only first error encountered will be returned,
+// subsequent invocations will return io.EOF.
 func (dec *Decoder) Decode() (interface{}, error) {
-	// if current queue ended, switch to next
-	if dec.objectIndex == len(dec.objectQueue) {
-		output := dec.outputs[dec.outputIndex]
-		dec.outputIndex = (dec.outputIndex + 1) % len(dec.outputs)
-
-		result, ok := <-output
-		if !ok {
-			return nil, dec.err
-		}
-
-		switch v := (result).(type) {
-		case []interface{}:
-			dec.objectIndex = 0
-			dec.objectQueue = v
-		case error:
-			dec.stop()
-			return nil, v
-		}
+	p, ok := <-dec.serializer
+	if !ok {
+		return nil, io.EOF
 	}
-
-	// return next decoded object from current queue
-	dec.objectIndex++
-	return dec.objectQueue[dec.objectIndex-1], nil
+	return p.i, p.e
 }
 
 func (dec *Decoder) readFileBlock() (*OSMPBF.BlobHeader, *OSMPBF.Blob, error) {
