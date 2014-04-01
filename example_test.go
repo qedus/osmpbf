@@ -1,19 +1,16 @@
-osmpbf
-===
+package osmpbf_test
 
-Package osmpbf is used to decode OpenStreetMap pbf files.
+import (
+	"fmt"
+	"github.com/qedus/osmpbf"
+	"io"
+	"log"
+	"os"
+	"runtime"
+)
 
-## Installation
-
-```bash
-$ go get github.com/qedus/osmpbf
-```
-
-## Usage
-
-Usage is similar to `json.Decode`.
-
-```Go
+// Don't forget to sync with README.md
+func Example() {
 	f, err := os.Open("greater-london-140324.osm.pbf")
 	if err != nil {
 		log.Fatal(err)
@@ -50,16 +47,6 @@ Usage is similar to `json.Decode`.
 	}
 
 	fmt.Printf("Nodes: %d, Ways: %d, Relations: %d\n", nc, wc, rc)
-```
-
-## Performance
-
-My old 2.53 GHz Intel Core 2 Duo MacBook Pro with a SATA hard drive can run the above program over the whole planet as of late 2013 in just over 1 hour. The code is probably more disk IO bound than CPU bound.
-
-## To Do
-
-The parseNodes code has not been tested as I can only find PBF files with DenseNode format.
-
-The code does not decode DenseInfo or Info data structures as I currently have no need for them.
-
-An Encoder still needs to be created to reverse the process.
+	// Output:
+	// Nodes: 2729006, Ways: 459055, Relations: 12833
+}

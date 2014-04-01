@@ -6,6 +6,8 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -28,6 +30,45 @@ var (
 	}
 
 	IDs map[string]bool
+
+	enc uint64 = 2729006
+	ewc uint64 = 459055
+	erc uint64 = 12833
+
+	en = &Node{
+		ID:  18088578,
+		Lat: 51.5442632,
+		Lon: -0.2010027,
+		Tags: map[string]string{
+			"alt_name":   "The King's Head",
+			"amenity":    "pub",
+			"created_by": "JOSM",
+			"name":       "The Luminaire",
+			"note":       "Live music venue too",
+		},
+	}
+
+	ew = &Way{
+		ID:      4257116,
+		NodeIDs: []int64{21544864, 333731851, 333731852, 333731850, 333731855, 333731858, 333731854, 108047, 769984352, 21544864},
+		Tags: map[string]string{
+			"area":    "yes",
+			"highway": "pedestrian",
+			"name":    "Fitzroy Square",
+		},
+	}
+
+	er = &Relation{
+		ID: 7677,
+		Members: []Member{
+			Member{ID: 4875932, Type: WayType, Role: "outer"},
+			Member{ID: 4894305, Type: WayType, Role: "inner"},
+		},
+		Tags: map[string]string{
+			"created_by": "Potlatch 0.9c",
+			"type":       "multipolygon",
+		},
+	}
 )
 
 func init() {
@@ -42,60 +83,25 @@ func init() {
 	}
 }
 
-func TestDecoder(t *testing.T) {
+func TestDecode(t *testing.T) {
 	f, err := os.Open(London)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
 
-	var n *Node
-	en := &Node{
-		ID:  18088578,
-		Lat: 51.5442632,
-		Lon: -0.2010027,
-		Tags: map[string]string{
-			"alt_name":   "The King's Head",
-			"amenity":    "pub",
-			"created_by": "JOSM",
-			"name":       "The Luminaire",
-			"note":       "Live music venue too",
-		},
-	}
-
-	var w *Way
-	ew := &Way{
-		ID:      4257116,
-		NodeIDs: []int64{21544864, 333731851, 333731852, 333731850, 333731855, 333731858, 333731854, 108047, 769984352, 21544864},
-		Tags: map[string]string{
-			"area":    "yes",
-			"highway": "pedestrian",
-			"name":    "Fitzroy Square",
-		},
-	}
-
-	var r *Relation
-	er := &Relation{
-		ID: 7677,
-		Members: []Member{
-			Member{ID: 4875932, Type: WayType, Role: "outer"},
-			Member{ID: 4894305, Type: WayType, Role: "inner"},
-		},
-		Tags: map[string]string{
-			"created_by": "Potlatch 0.9c",
-			"type":       "multipolygon",
-		},
-	}
-
-	var nc, wc, rc int
-	var id string
-	enc, ewc, erc := 2729006, 459055, 12833
-	idsOrder := make([]string, 0, len(IDsExpectedOrder))
 	d := NewDecoder(f)
 	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	var n *Node
+	var w *Way
+	var r *Relation
+	var nc, wc, rc uint64
+	var id string
+	idsOrder := make([]string, 0, len(IDsExpectedOrder))
 	for {
 		if v, err := d.Decode(); err == io.EOF {
 			break
@@ -153,7 +159,76 @@ func TestDecoder(t *testing.T) {
 	}
 }
 
-func BenchmarkDecoder(b *testing.B) {
+func TestDecodeConcurrent(t *testing.T) {
+	f, err := os.Open(London)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	d := NewDecoder(f)
+	err = d.Start(runtime.GOMAXPROCS(-1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var n *Node
+	var w *Way
+	var r *Relation
+	var nc, wc, rc uint64
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+
+		go func() {
+			for {
+				if v, err := d.Decode(); err == io.EOF {
+					break
+				} else if err != nil {
+					t.Fatal(err)
+				} else {
+					switch v := v.(type) {
+					case *Node:
+						atomic.AddUint64(&nc, 1)
+						if v.ID == en.ID {
+							n = v
+						}
+					case *Way:
+						atomic.AddUint64(&wc, 1)
+						if v.ID == ew.ID {
+							w = v
+						}
+					case *Relation:
+						atomic.AddUint64(&rc, 1)
+						if v.ID == er.ID {
+							r = v
+						}
+					default:
+						t.Fatalf("unknown type %T", v)
+					}
+				}
+			}
+
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	if !reflect.DeepEqual(en, n) {
+		t.Errorf("\nExpected: %#v\nActual:   %#v", en, n)
+	}
+	if !reflect.DeepEqual(ew, w) {
+		t.Errorf("\nExpected: %#v\nActual:   %#v", ew, w)
+	}
+	if !reflect.DeepEqual(er, r) {
+		t.Errorf("\nExpected: %#v\nActual:   %#v", er, r)
+	}
+	if enc != nc || ewc != wc || erc != rc {
+		t.Errorf("\nExpected %7d nodes, %7d ways, %7d relations\nGot      %7d nodes, %7d ways, %7d relations", enc, ewc, erc, nc, wc, rc)
+	}
+}
+
+func BenchmarkDecode(b *testing.B) {
 	file := os.Getenv("OSMPBF_BENCHMARK_FILE")
 	if file == "" {
 		file = London
@@ -167,12 +242,15 @@ func BenchmarkDecoder(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		f.Seek(0, 0)
+
 		d := NewDecoder(f)
 		err = d.Start(runtime.GOMAXPROCS(-1))
 		if err != nil {
 			b.Fatal(err)
 		}
-		n, w, r, c, start := 0, 0, 0, 0, time.Now()
+
+		var nc, wc, rc uint64
+		start := time.Now()
 		for {
 			if v, err := d.Decode(); err == io.EOF {
 				break
@@ -181,19 +259,75 @@ func BenchmarkDecoder(b *testing.B) {
 			} else {
 				switch v := v.(type) {
 				case *Node:
-					n++
+					nc++
 				case *Way:
-					w++
+					wc++
 				case *Relation:
-					r++
+					rc++
 				default:
 					b.Fatalf("unknown type %T", v)
 				}
 			}
-			c++
 		}
 
-		b.Logf("Done in %.3f seconds. Total: %d, Nodes: %d, Ways: %d, Relations: %d\n",
-			time.Now().Sub(start).Seconds(), c, n, w, r)
+		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
+			time.Now().Sub(start).Seconds(), nc, wc, rc)
+	}
+}
+
+func BenchmarkDecodeConcurrent(b *testing.B) {
+	file := os.Getenv("OSMPBF_BENCHMARK_FILE")
+	if file == "" {
+		file = London
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer f.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f.Seek(0, 0)
+
+		d := NewDecoder(f)
+		err = d.Start(runtime.GOMAXPROCS(-1))
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		var nc, wc, rc uint64
+		start := time.Now()
+		var wg sync.WaitGroup
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+
+			go func() {
+				for {
+					if v, err := d.Decode(); err == io.EOF {
+						break
+					} else if err != nil {
+						b.Fatal(err)
+					} else {
+						switch v := v.(type) {
+						case *Node:
+							atomic.AddUint64(&nc, 1)
+						case *Way:
+							atomic.AddUint64(&wc, 1)
+						case *Relation:
+							atomic.AddUint64(&rc, 1)
+						default:
+							b.Fatalf("unknown type %T", v)
+						}
+					}
+				}
+
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+
+		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
+			time.Now().Sub(start).Seconds(), nc, wc, rc)
 	}
 }
