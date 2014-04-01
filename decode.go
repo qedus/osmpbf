@@ -91,6 +91,10 @@ func NewDecoder(r io.Reader) *Decoder {
 
 // Start decoding process using n goroutines.
 func (dec *Decoder) Start(n int) error {
+	if n < 1 {
+		n = 1
+	}
+
 	// read OSMHeader
 	blobHeader, blob, err := dec.readFileBlock()
 	if err == nil {
