@@ -3,6 +3,7 @@ package osmpbf
 import (
 	"code.google.com/p/goprotobuf/proto"
 	"github.com/qedus/osmpbf/OSMPBF"
+	"time"
 )
 
 // Decoder for Blob with OSMData (PrimitiveBlock)
@@ -56,7 +57,7 @@ func (dec *dataDecoder) parseNodes(pb *OSMPBF.PrimitiveBlock, nodes []*OSMPBF.No
 
 		tags := extractTags(st, node.GetKeys(), node.GetVals())
 
-		dec.q = append(dec.q, &Node{id, latitude, longitude, tags})
+		dec.q = append(dec.q, &Node{id, latitude, longitude, tags, time.Time{}})
 
 		panic("Please test this first")
 	}
@@ -68,11 +69,20 @@ func (dec *dataDecoder) parseDenseNodes(pb *OSMPBF.PrimitiveBlock, dn *OSMPBF.De
 	granularity := int64(pb.GetGranularity())
 	latOffset := pb.GetLatOffset()
 	lonOffset := pb.GetLonOffset()
+	dateGranularity := int64(pb.GetDateGranularity())
 	ids := dn.GetId()
 	lats := dn.GetLat()
 	lons := dn.GetLon()
+
+	di := dn.GetDenseinfo()
+	var timestamps []int64
+	if di != nil {
+		timestamps = di.GetTimestamp()
+	}
+
 	tu := tagUnpacker{st, dn.GetKeysVals(), 0}
-	var id, lat, lon int64
+	var id, lat, lon, timestamp int64
+	var ts time.Time
 	for index := range ids {
 		id = ids[index] + id
 		lat = lats[index] + lat
@@ -81,7 +91,13 @@ func (dec *dataDecoder) parseDenseNodes(pb *OSMPBF.PrimitiveBlock, dn *OSMPBF.De
 		longitude := 1e-9 * float64((lonOffset + (granularity * lon)))
 		tags := tu.next()
 
-		dec.q = append(dec.q, &Node{id, latitude, longitude, tags})
+		if timestamps != nil {
+			timestamp = timestamps[index] + timestamp
+			millisec := time.Duration(timestamp*dateGranularity) * time.Millisecond
+			ts = time.Unix(0, millisec.Nanoseconds()).UTC()
+		}
+
+		dec.q = append(dec.q, &Node{id, latitude, longitude, tags, ts})
 	}
 }
 
