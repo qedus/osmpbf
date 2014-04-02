@@ -10,6 +10,7 @@ import (
 )
 
 // Don't forget to sync with README.md
+
 func Example() {
 	f, err := os.Open("greater-london-140324.osm.pbf")
 	if err != nil {
