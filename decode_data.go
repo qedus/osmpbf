@@ -103,6 +103,8 @@ func (dec *dataDecoder) parseDenseNodes(pb *OSMPBF.PrimitiveBlock, dn *OSMPBF.De
 
 func (dec *dataDecoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way) {
 	st := pb.GetStringtable().GetS()
+	dateGranularity := int64(pb.GetDateGranularity())
+
 	for _, way := range ways {
 		id := way.GetId()
 
@@ -116,7 +118,14 @@ func (dec *dataDecoder) parseWays(pb *OSMPBF.PrimitiveBlock, ways []*OSMPBF.Way)
 			nodeIDs[index] = nodeID
 		}
 
-		dec.q = append(dec.q, &Way{id, tags, nodeIDs})
+		var ts time.Time
+		i := way.GetInfo()
+		if i != nil {
+			millisec := time.Duration(i.GetTimestamp()*dateGranularity) * time.Millisecond
+			ts = time.Unix(0, millisec.Nanoseconds()).UTC()
+		}
+
+		dec.q = append(dec.q, &Way{id, tags, nodeIDs, ts})
 	}
 }
 
@@ -151,11 +160,20 @@ func extractMembers(stringTable []string, rel *OSMPBF.Relation) []Member {
 
 func (dec *dataDecoder) parseRelations(pb *OSMPBF.PrimitiveBlock, relations []*OSMPBF.Relation) {
 	st := pb.GetStringtable().GetS()
+	dateGranularity := int64(pb.GetDateGranularity())
+
 	for _, rel := range relations {
 		id := rel.GetId()
 		tags := extractTags(st, rel.GetKeys(), rel.GetVals())
 		members := extractMembers(st, rel)
 
-		dec.q = append(dec.q, &Relation{id, tags, members})
+		var ts time.Time
+		i := rel.GetInfo()
+		if i != nil {
+			millisec := time.Duration(i.GetTimestamp()*dateGranularity) * time.Millisecond
+			ts = time.Unix(0, millisec.Nanoseconds()).UTC()
+		}
+
+		dec.q = append(dec.q, &Relation{id, tags, members, ts})
 	}
 }

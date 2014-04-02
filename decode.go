@@ -38,19 +38,21 @@ type Node struct {
 }
 
 type Way struct {
-	ID      int64
-	Tags    map[string]string
-	NodeIDs []int64
+	ID        int64
+	Tags      map[string]string
+	NodeIDs   []int64
+	Timestamp time.Time
 
-	// TODO: Add Info
+	// TODO: Add more Info fields
 }
 
 type Relation struct {
-	ID      int64
-	Tags    map[string]string
-	Members []Member
+	ID        int64
+	Tags      map[string]string
+	Members   []Member
+	Timestamp time.Time
 
-	// TODO: Add Info
+	// TODO: Add more Info fields
 	// TODO: Add roles_sid
 }
 

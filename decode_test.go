@@ -65,6 +65,7 @@ var (
 			"highway": "pedestrian",
 			"name":    "Fitzroy Square",
 		},
+		Timestamp: parseTime("2013-08-07T12:08:39Z"),
 	}
 
 	er = &Relation{
@@ -77,6 +78,7 @@ var (
 			"created_by": "Potlatch 0.9c",
 			"type":       "multipolygon",
 		},
+		Timestamp: parseTime("2008-07-19T15:04:03Z"),
 	}
 )
 
