@@ -18,6 +18,14 @@ const (
 	LondonURL = "https://googledrive.com/host/0B8pisLiGtmqDR3dOR3hrWUpRTVE"
 )
 
+func parseTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
 var (
 	IDsExpectedOrder = []string{
 		"node/44", "node/47", "node/52", "node/58", "node/60", // start of dense nodes
@@ -46,6 +54,7 @@ var (
 			"name":       "The Luminaire",
 			"note":       "Live music venue too",
 		},
+		Timestamp: parseTime("2009-05-20T10:28:54Z"),
 	}
 
 	ew = &Way{
@@ -56,6 +65,7 @@ var (
 			"highway": "pedestrian",
 			"name":    "Fitzroy Square",
 		},
+		Timestamp: parseTime("2013-08-07T12:08:39Z"),
 	}
 
 	er = &Relation{
@@ -68,6 +78,7 @@ var (
 			"created_by": "Potlatch 0.9c",
 			"type":       "multipolygon",
 		},
+		Timestamp: parseTime("2008-07-19T15:04:03Z"),
 	}
 )
 

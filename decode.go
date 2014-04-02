@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"github.com/qedus/osmpbf/OSMPBF"
 	"io"
+	"time"
 )
 
 const (
@@ -27,28 +28,31 @@ var (
 )
 
 type Node struct {
-	ID   int64
-	Lat  float64
-	Lon  float64
-	Tags map[string]string
+	ID        int64
+	Lat       float64
+	Lon       float64
+	Tags      map[string]string
+	Timestamp time.Time
 
-	// TODO: Add DenseInfo
+	// TODO: Add more DenseInfo fields
 }
 
 type Way struct {
-	ID      int64
-	Tags    map[string]string
-	NodeIDs []int64
+	ID        int64
+	Tags      map[string]string
+	NodeIDs   []int64
+	Timestamp time.Time
 
-	// TODO: Add Info
+	// TODO: Add more Info fields
 }
 
 type Relation struct {
-	ID      int64
-	Tags    map[string]string
-	Members []Member
+	ID        int64
+	Tags      map[string]string
+	Members   []Member
+	Timestamp time.Time
 
-	// TODO: Add Info
+	// TODO: Add more Info fields
 	// TODO: Add roles_sid
 }
 
