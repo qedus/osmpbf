@@ -1,6 +1,7 @@
-// Package osmpbf decodes OpenStreetMap pbf files.
-// Use this package by creating a NewDecoder and passing it a PBF file. Use
-// Decode to return Node, Way and Relation structs.
+// Package osmpbf decodes OpenStreetMap (OSM) PBF files.
+// Use this package by creating a NewDecoder and passing it a PBF file.
+// Use Start to start decoding process. 
+// Use Decode to return Node, Way and Relation structs.
 package osmpbf
 
 import (
