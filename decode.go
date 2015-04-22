@@ -1,6 +1,6 @@
 // Package osmpbf decodes OpenStreetMap (OSM) PBF files.
 // Use this package by creating a NewDecoder and passing it a PBF file.
-// Use Start to start decoding process. 
+// Use Start to start decoding process.
 // Use Decode to return Node, Way and Relation structs.
 package osmpbf
 
@@ -28,33 +28,35 @@ var (
 	}
 )
 
-type Node struct {
-	ID        int64
-	Lat       float64
-	Lon       float64
-	Tags      map[string]string
+type Info struct {
+	Version   int32
 	Timestamp time.Time
+	Changeset int64
+	Uid       int32
+	User      string
+	Visible   bool
+}
 
-	// TODO: Add more DenseInfo fields
+type Node struct {
+	ID   int64
+	Lat  float64
+	Lon  float64
+	Tags map[string]string
+	Info Info
 }
 
 type Way struct {
-	ID        int64
-	Tags      map[string]string
-	NodeIDs   []int64
-	Timestamp time.Time
-
-	// TODO: Add more Info fields
+	ID      int64
+	Tags    map[string]string
+	NodeIDs []int64
+	Info    Info
 }
 
 type Relation struct {
-	ID        int64
-	Tags      map[string]string
-	Members   []Member
-	Timestamp time.Time
-
-	// TODO: Add more Info fields
-	// TODO: Add roles_sid
+	ID      int64
+	Tags    map[string]string
+	Members []Member
+	Info    Info
 }
 
 type MemberType int
