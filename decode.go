@@ -1,19 +1,20 @@
 // Package osmpbf decodes OpenStreetMap (OSM) PBF files.
 // Use this package by creating a NewDecoder and passing it a PBF file.
-// Use Start to start decoding process. 
+// Use Start to start decoding process.
 // Use Decode to return Node, Way and Relation structs.
 package osmpbf
 
 import (
 	"bytes"
-	"code.google.com/p/goprotobuf/proto"
 	"compress/zlib"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/qedus/osmpbf/OSMPBF"
 	"io"
 	"time"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/qedus/osmpbf/OSMPBF"
 )
 
 const (
