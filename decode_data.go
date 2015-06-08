@@ -1,9 +1,10 @@
 package osmpbf
 
 import (
-	"code.google.com/p/goprotobuf/proto"
-	"github.com/qedus/osmpbf/OSMPBF"
 	"time"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/qedus/osmpbf/OSMPBF"
 )
 
 // Decoder for Blob with OSMData (PrimitiveBlock)
