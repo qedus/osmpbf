@@ -188,7 +188,7 @@ type denseInfoState struct {
 	timestamp int64
 	changeset int64
 	uid       int32
-	user_sid  int32
+	userSid   int32
 }
 
 func extractDenseInfo(stringTable []string, state *denseInfoState, di *OSMPBF.DenseInfo, index int, dateGranularity int64) Info {
@@ -220,8 +220,8 @@ func extractDenseInfo(stringTable []string, state *denseInfoState, di *OSMPBF.De
 
 	usersids := di.GetUserSid()
 	if len(usersids) > 0 {
-		state.user_sid = usersids[index] + state.user_sid
-		info.User = stringTable[state.user_sid]
+		state.userSid = usersids[index] + state.userSid
+		info.User = stringTable[state.userSid]
 	}
 
 	visibleArray := di.GetVisible()
