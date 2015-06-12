@@ -6,14 +6,15 @@ package osmpbf
 
 import (
 	"bytes"
-	"code.google.com/p/goprotobuf/proto"
 	"compress/zlib"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/qedus/osmpbf/OSMPBF"
 	"io"
 	"time"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/qedus/osmpbf/OSMPBF"
 )
 
 const (
