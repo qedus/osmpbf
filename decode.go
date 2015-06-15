@@ -87,6 +87,8 @@ type Decoder struct {
 	// for data decoders
 	inputs  []chan<- pair
 	outputs []<-chan pair
+	
+	totalreadsize  int64  // Total data size have been read
 }
 
 // NewDecoder returns a new decoder that reads from r.
@@ -95,6 +97,11 @@ func NewDecoder(r io.Reader) *Decoder {
 		r:          r,
 		serializer: make(chan pair, 8000), // typical PrimitiveBlock contains 8k OSM entities
 	}
+}
+
+// Total data size have been read
+func (dec *Decoder) GetTotalReadSize() int64 {
+        return dec.totalreadsize
 }
 
 // Start decoding process using n goroutines.
@@ -218,6 +225,8 @@ func (dec *Decoder) readFileBlock() (*OSMPBF.BlobHeader, *OSMPBF.Blob, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
+        dec.totalreadsize += int64(blobHeaderSize) + int64(blobHeader.GetDatasize())
 
 	return blobHeader, blob, err
 }
