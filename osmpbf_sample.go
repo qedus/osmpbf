@@ -12,10 +12,10 @@ import (
     "github.com/qedus/osmpbf"
 )
 
-// $ go run osmpbf.go -ncpu 4 greater-london-latest.osm.pbf
+// $ go run osmpbf_sample.go -ncpu 4 greater-london-latest.osm.pbf
 // 37975 / 37975 [====================================================] 100.00 % 1s
 // Nodes: 3,006,586, Ways: 509,726, Relations: 13,911
-// $ go run osmpbf.go -ncpu 1 greater-london-latest.osm.pbf
+// $ go run osmpbf_sample.go -ncpu 1 greater-london-latest.osm.pbf
 // 37975 / 37975 [====================================================] 100.00 % 5s
 // Nodes: 3,006,586, Ways: 509,726, Relations: 13,911
 
