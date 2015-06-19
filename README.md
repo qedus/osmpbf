@@ -55,10 +55,10 @@ Usage is similar to `json.Decode`.
 ### Outputs of a sample code
 
 ```sh
-$ go run osmpbf.go -ncpu 4 greater-london-140324.osm.pbf 
+$ go run osmpbf_progressbar.go -ncpu 4 greater-london-140324.osm.pbf 
 33728 / 33728 [====================================================] 100.00 % 1s
 Nodes: 2,729,006, Ways: 459,055, Relations: 12,833
-$ go run osmpbf.go -ncpu 1 greater-london-140324.osm.pbf 
+$ go run osmpbf_progressbar.go -ncpu 1 greater-london-140324.osm.pbf 
 33728 / 33728 [====================================================] 100.00 % 4s
 Nodes: 2,729,006, Ways: 459,055, Relations: 12,833
 ```
