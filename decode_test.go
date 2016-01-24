@@ -3,6 +3,7 @@ package osmpbf
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"reflect"
 	"runtime"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	// originally downloaded from http://download.geofabrik.de/europe/great-britain/england/greater-london.html
+	// Originally downloaded from http://download.geofabrik.de/europe/great-britain/england/greater-london.html
 	London    = "greater-london-140324.osm.pbf"
 	LondonURL = "https://googledrive.com/host/0B8pisLiGtmqDR3dOR3hrWUpRTVE"
 )
@@ -28,13 +29,24 @@ func parseTime(s string) time.Time {
 
 var (
 	IDsExpectedOrder = []string{
-		"node/44", "node/47", "node/52", "node/58", "node/60", // start of dense nodes
-		"node/79",                                                                                     // just because way/79 is already there
-		"node/2740703694", "node/2740703695", "node/2740703697", "node/2740703699", "node/2740703701", // end of dense nodes
-		"way/73", "way/74", "way/75", "way/79", "way/482", // start of ways
-		"way/268745428", "way/268745431", "way/268745434", "way/268745436", "way/268745439", // end of ways
-		"relation/69", "relation/94", "relation/152", "relation/245", "relation/332", // start of relations
-		"relation/3593436", "relation/3595575", "relation/3595798", "relation/3599126", "relation/3599127", // end of relations
+		// Start of dense nodes.
+		"node/44", "node/47", "node/52", "node/58", "node/60",
+		"node/79", // Just because way/79 is already there
+		"node/2740703694", "node/2740703695", "node/2740703697",
+		"node/2740703699", "node/2740703701",
+		// End of dense nodes.
+
+		// Start of ways.
+		"way/73", "way/74", "way/75", "way/79", "way/482",
+		"way/268745428", "way/268745431", "way/268745434", "way/268745436",
+		"way/268745439",
+		// End of ways.
+
+		// Start of relations.
+		"relation/69", "relation/94", "relation/152", "relation/245",
+		"relation/332", "relation/3593436", "relation/3595575",
+		"relation/3595798", "relation/3599126", "relation/3599127",
+		// End of relations
 	}
 
 	IDs map[string]bool
@@ -65,8 +77,10 @@ var (
 	}
 
 	ew = &Way{
-		ID:      4257116,
-		NodeIDs: []int64{21544864, 333731851, 333731852, 333731850, 333731855, 333731858, 333731854, 108047, 769984352, 21544864},
+		ID: 4257116,
+		NodeIDs: []int64{
+			21544864, 333731851, 333731852, 333731850, 333731855,
+			333731858, 333731854, 108047, 769984352, 21544864},
 		Tags: map[string]string{
 			"area":    "yes",
 			"highway": "pedestrian",
@@ -104,18 +118,37 @@ var (
 )
 
 func init() {
-	_, err := os.Stat(London)
-	if os.IsNotExist(err) {
-		panic(fmt.Sprintf("\nDownload %s from %s.\nFor example: 'wget -O %s %s'", London, LondonURL, London, LondonURL))
-	}
-
 	IDs = make(map[string]bool)
 	for _, id := range IDsExpectedOrder {
 		IDs[id] = false
 	}
 }
 
+func downloadTestOSMFile(t *testing.T) {
+	if _, err := os.Stat(London); os.IsNotExist(err) {
+		out, err := os.Create(London)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer out.Close()
+
+		resp, err := http.Get(LondonURL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+
+		if _, err := io.Copy(out, resp.Body); err != nil {
+			t.Fatal(err)
+		}
+	} else if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDecode(t *testing.T) {
+	downloadTestOSMFile(t)
+
 	f, err := os.Open(London)
 	if err != nil {
 		t.Fatal(err)
@@ -184,7 +217,8 @@ func TestDecode(t *testing.T) {
 		t.Errorf("\nExpected: %#v\nActual:   %#v", er, r)
 	}
 	if enc != nc || ewc != wc || erc != rc {
-		t.Errorf("\nExpected %7d nodes, %7d ways, %7d relations\nGot      %7d nodes, %7d ways, %7d relations", enc, ewc, erc, nc, wc, rc)
+		t.Errorf("\nExpected %7d nodes, %7d ways, %7d relations\nGot %7d nodes, %7d ways, %7d relations.",
+			enc, ewc, erc, nc, wc, rc)
 	}
 	if !reflect.DeepEqual(IDsExpectedOrder, idsOrder) {
 		t.Errorf("\nExpected: %v\nGot:      %v", IDsExpectedOrder, idsOrder)
@@ -192,6 +226,8 @@ func TestDecode(t *testing.T) {
 }
 
 func TestDecodeConcurrent(t *testing.T) {
+	downloadTestOSMFile(t)
+
 	f, err := os.Open(London)
 	if err != nil {
 		t.Fatal(err)
@@ -256,7 +292,8 @@ func TestDecodeConcurrent(t *testing.T) {
 		t.Errorf("\nExpected: %#v\nActual:   %#v", er, r)
 	}
 	if enc != nc || ewc != wc || erc != rc {
-		t.Errorf("\nExpected %7d nodes, %7d ways, %7d relations\nGot      %7d nodes, %7d ways, %7d relations", enc, ewc, erc, nc, wc, rc)
+		t.Errorf("\nExpected %7d nodes, %7d ways, %7d relations\nGot %7d nodes, %7d ways, %7d relations",
+			enc, ewc, erc, nc, wc, rc)
 	}
 }
 

@@ -1,5 +1,6 @@
-osmpbf
-===
+# osmpbf
+
+[![Build Status](https://travis-ci.org/qedus/osmpbf.svg?branch=master)](https://travis-ci.org/qedus/osmpbf) [![Coverage Status](https://coveralls.io/repos/qedus/osmpbf/badge.png?branch=master)](https://coveralls.io/r/qedus/osmpbf?branch=master) [![GoDoc](https://godoc.org/github.com/qedus/osmpbf?status.png)](https://godoc.org/github.com/qedus/osmpbf)
 
 Package osmpbf is used to decode OpenStreetMap pbf files.
 
