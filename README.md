@@ -61,6 +61,4 @@ http://godoc.org/github.com/qedus/osmpbf
 
 The parseNodes code has not been tested as I can only find PBF files with DenseNode format.
 
-The code does not decode DenseInfo or Info data structures as I currently have no need for them.
-
 An Encoder still needs to be created to reverse the process.
