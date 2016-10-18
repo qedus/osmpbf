@@ -15,8 +15,9 @@ import (
 
 const (
 	// Originally downloaded from http://download.geofabrik.de/europe/great-britain/england/greater-london.html
+	// Stored at https://gist.github.com/AlekSi/d4369aa13cf1fc5ddfac3e91b67b2f7b
 	London    = "greater-london-140324.osm.pbf"
-	LondonURL = "https://googledrive.com/host/0B8pisLiGtmqDR3dOR3hrWUpRTVE"
+	LondonURL = "https://gist.githubusercontent.com/AlekSi/d4369aa13cf1fc5ddfac3e91b67b2f7b/raw/f87959d6c9466547d9759971e071a15049b67ae2/greater-london-140324.osm.pbf"
 )
 
 func parseTime(s string) time.Time {
@@ -126,19 +127,23 @@ func init() {
 
 func downloadTestOSMFile(t *testing.T) {
 	if _, err := os.Stat(London); os.IsNotExist(err) {
-		out, err := os.Create(London)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer out.Close()
-
 		resp, err := http.Get(LondonURL)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer resp.Body.Close()
 
-		if _, err := io.Copy(out, resp.Body); err != nil {
+		if resp.StatusCode != 200 {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+
+		out, err := os.Create(London)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer out.Close()
+
+		if _, err = io.Copy(out, resp.Body); err != nil {
 			t.Fatal(err)
 		}
 	} else if err != nil {
