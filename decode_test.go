@@ -100,8 +100,8 @@ var (
 	er = &Relation{
 		ID: 7677,
 		Members: []Member{
-			Member{ID: 4875932, Type: WayType, Role: "outer"},
-			Member{ID: 4894305, Type: WayType, Role: "inner"},
+			{ID: 4875932, Type: WayType, Role: "outer"},
+			{ID: 4894305, Type: WayType, Role: "inner"},
 		},
 		Tags: map[string]string{
 			"created_by": "Potlatch 0.9c",
