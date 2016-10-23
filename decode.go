@@ -83,7 +83,7 @@ type pair struct {
 type Decoder struct {
 	sizeBuf   []byte
 	headerBuf []byte
-	blobBuf   []byte
+	blobBuf   *bytes.Buffer
 
 	r          io.Reader
 	serializer chan pair
@@ -98,7 +98,7 @@ func NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{
 		sizeBuf:    make([]byte, 4),
 		headerBuf:  make([]byte, maxBlobHeaderSize),
-		blobBuf:    make([]byte, maxBlobSize),
+		blobBuf:    bytes.NewBuffer(make([]byte, 0, maxBlobSize)),
 		r:          r,
 		serializer: make(chan pair, 8000), // typical PrimitiveBlock contains 8k OSM entities
 	}
@@ -259,13 +259,13 @@ func (dec *Decoder) readBlobHeader(size uint32) (*OSMPBF.BlobHeader, error) {
 }
 
 func (dec *Decoder) readBlob(blobHeader *OSMPBF.BlobHeader) (*OSMPBF.Blob, error) {
-	dec.blobBuf = dec.blobBuf[:blobHeader.GetDatasize()]
-	if _, err := io.ReadFull(dec.r, dec.blobBuf); err != nil {
+	dec.blobBuf.Reset()
+	if _, err := io.CopyN(dec.blobBuf, dec.r, int64(blobHeader.GetDatasize())); err != nil {
 		return nil, err
 	}
 
 	blob := new(OSMPBF.Blob)
-	if err := proto.Unmarshal(dec.blobBuf, blob); err != nil {
+	if err := proto.Unmarshal(dec.blobBuf.Bytes(), blob); err != nil {
 		return nil, err
 	}
 	return blob, nil
