@@ -19,7 +19,10 @@ import (
 
 const (
 	maxBlobHeaderSize = 64 * 1024
-	maxBlobSize       = 32 * 1024 * 1024
+
+	initialBlobBufSize = 1 * 1024 * 1024
+
+	MaxBlobSize = 32 * 1024 * 1024
 )
 
 var (
@@ -95,13 +98,18 @@ type Decoder struct {
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{
+	d := &Decoder{
 		sizeBuf:    make([]byte, 4),
 		headerBuf:  make([]byte, maxBlobHeaderSize),
-		blobBuf:    bytes.NewBuffer(make([]byte, 0, maxBlobSize)),
 		r:          r,
 		serializer: make(chan pair, 8000), // typical PrimitiveBlock contains 8k OSM entities
 	}
+	d.SetBlobBufferSize(initialBlobBufSize)
+	return d
+}
+
+func (dec *Decoder) SetBlobBufferSize(n int) {
+	dec.blobBuf = bytes.NewBuffer(make([]byte, 0, n))
 }
 
 // Start decoding process using n goroutines.
@@ -252,7 +260,7 @@ func (dec *Decoder) readBlobHeader(size uint32) (*OSMPBF.BlobHeader, error) {
 		return nil, err
 	}
 
-	if blobHeader.GetDatasize() >= maxBlobSize {
+	if blobHeader.GetDatasize() >= MaxBlobSize {
 		return nil, errors.New("Blob size >= 32Mb")
 	}
 	return blobHeader, nil
