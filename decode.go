@@ -22,6 +22,7 @@ const (
 
 	initialBlobBufSize = 1 * 1024 * 1024
 
+	// MaxBlobSize is maximum supported blob size.
 	MaxBlobSize = 32 * 1024 * 1024
 )
 
@@ -100,11 +101,14 @@ func NewDecoder(r io.Reader) *Decoder {
 		r:          r,
 		serializer: make(chan pair, 8000), // typical PrimitiveBlock contains 8k OSM entities
 	}
-	d.SetBlobBufferSize(initialBlobBufSize)
+	d.SetBufferSize(initialBlobBufSize)
 	return d
 }
 
-func (dec *Decoder) SetBlobBufferSize(n int) {
+// SetBufferSize sets initial size of decoding buffer. Default value is 1MB, you can set higher value
+// (for example, MaxBlobSize) for (probably) faster decoding, or lower value for reduced memory consumption.
+// Any value will produce valid results; buffer will grow automatically if required.
+func (dec *Decoder) SetBufferSize(n int) {
 	dec.buf = bytes.NewBuffer(make([]byte, 0, n))
 }
 
@@ -201,7 +205,7 @@ func (dec *Decoder) Start(n int) error {
 }
 
 // Decode reads the next object from the input stream and returns either a
-// Node, Way or Relation struct representing the underlying OpenStreetMap PBF
+// pointer to Node, Way or Relation struct representing the underlying OpenStreetMap PBF
 // data, or error encountered. The end of the input stream is reported by an io.EOF error.
 //
 // Decode is safe for parallel execution. Only first error encountered will be returned,

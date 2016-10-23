@@ -14,7 +14,7 @@ $ go get github.com/qedus/osmpbf
 
 ## Usage
 
-Usage is similar to `json.Decode`.
+Usage is similar to `json.Decoder`.
 
 ```Go
 	f, err := os.Open("greater-london-140324.osm.pbf")
@@ -24,7 +24,12 @@ Usage is similar to `json.Decode`.
 	defer f.Close()
 
 	d := osmpbf.NewDecoder(f)
-	err = d.Start(runtime.GOMAXPROCS(-1)) // use several goroutines for faster decoding
+
+	// use more memory from the start, it is faster
+	d.SetBufferSize(osmpbf.MaxBlobSize)
+
+	// start decoding with several goroutines, it is faster
+	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		log.Fatal(err)
 	}

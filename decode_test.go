@@ -162,6 +162,7 @@ func TestDecode(t *testing.T) {
 	defer f.Close()
 
 	d := NewDecoder(f)
+	d.SetBufferSize(1)
 	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		t.Fatal(err)
@@ -241,6 +242,7 @@ func TestDecodeConcurrent(t *testing.T) {
 	defer f.Close()
 
 	d := NewDecoder(f)
+	d.SetBufferSize(1)
 	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		t.Fatal(err)
@@ -322,7 +324,7 @@ func BenchmarkDecode(b *testing.B) {
 
 		d := NewDecoder(f)
 		if blobBufferSize > 0 {
-			d.SetBlobBufferSize(blobBufferSize)
+			d.SetBufferSize(blobBufferSize)
 		}
 		err = d.Start(runtime.GOMAXPROCS(-1))
 		if err != nil {
@@ -374,7 +376,7 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 
 		d := NewDecoder(f)
 		if blobBufferSize > 0 {
-			d.SetBlobBufferSize(blobBufferSize)
+			d.SetBufferSize(blobBufferSize)
 		}
 		err = d.Start(runtime.GOMAXPROCS(-1))
 		if err != nil {

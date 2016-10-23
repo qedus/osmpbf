@@ -3,9 +3,11 @@ export GORACE := halt_on_error=1
 all: cover
 
 race:
+	go install -v -race
 	go test -v -race
 
 cover:
+	go install -v
 	go test -v -coverprofile=profile.cov
 
 bench:
