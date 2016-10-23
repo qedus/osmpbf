@@ -81,6 +81,10 @@ type pair struct {
 
 // A Decoder reads and decodes OpenStreetMap PBF data from an input stream.
 type Decoder struct {
+	sizeBuf   []byte
+	headerBuf []byte
+	blobBuf   []byte
+
 	r          io.Reader
 	serializer chan pair
 
@@ -92,6 +96,9 @@ type Decoder struct {
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{
+		sizeBuf:    make([]byte, 4),
+		headerBuf:  make([]byte, maxBlobHeaderSize),
+		blobBuf:    make([]byte, maxBlobSize),
 		r:          r,
 		serializer: make(chan pair, 8000), // typical PrimitiveBlock contains 8k OSM entities
 	}
@@ -223,11 +230,10 @@ func (dec *Decoder) readFileBlock() (*OSMPBF.BlobHeader, *OSMPBF.Blob, error) {
 }
 
 func (dec *Decoder) readBlobHeaderSize() (uint32, error) {
-	buf := make([]byte, 4)
-	if _, err := io.ReadFull(dec.r, buf); err != nil {
+	if _, err := io.ReadFull(dec.r, dec.sizeBuf); err != nil {
 		return 0, err
 	}
-	size := binary.BigEndian.Uint32(buf)
+	size := binary.BigEndian.Uint32(dec.sizeBuf)
 
 	if size >= maxBlobHeaderSize {
 		return 0, errors.New("BlobHeader size >= 64Kb")
@@ -236,13 +242,13 @@ func (dec *Decoder) readBlobHeaderSize() (uint32, error) {
 }
 
 func (dec *Decoder) readBlobHeader(size uint32) (*OSMPBF.BlobHeader, error) {
-	buf := make([]byte, size)
-	if _, err := io.ReadFull(dec.r, buf); err != nil {
+	dec.headerBuf = dec.headerBuf[:size]
+	if _, err := io.ReadFull(dec.r, dec.headerBuf); err != nil {
 		return nil, err
 	}
 
 	blobHeader := new(OSMPBF.BlobHeader)
-	if err := proto.Unmarshal(buf, blobHeader); err != nil {
+	if err := proto.Unmarshal(dec.headerBuf, blobHeader); err != nil {
 		return nil, err
 	}
 
@@ -253,13 +259,13 @@ func (dec *Decoder) readBlobHeader(size uint32) (*OSMPBF.BlobHeader, error) {
 }
 
 func (dec *Decoder) readBlob(blobHeader *OSMPBF.BlobHeader) (*OSMPBF.Blob, error) {
-	buf := make([]byte, blobHeader.GetDatasize())
-	if _, err := io.ReadFull(dec.r, buf); err != nil {
+	dec.blobBuf = dec.blobBuf[:blobHeader.GetDatasize()]
+	if _, err := io.ReadFull(dec.r, dec.blobBuf); err != nil {
 		return nil, err
 	}
 
 	blob := new(OSMPBF.Blob)
-	if err := proto.Unmarshal(buf, blob); err != nil {
+	if err := proto.Unmarshal(dec.blobBuf, blob); err != nil {
 		return nil, err
 	}
 	return blob, nil
