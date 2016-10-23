@@ -3,12 +3,17 @@ sudo: false
 go:
   - 1.5.4
   - 1.6.3
-  - 1.7.1
+  - 1.7.3
   - tip
+
 install:
   - go get -v github.com/qedus/osmpbf
+
 script:
-  - go test -v -covermode=count -coverprofile=profile.cov
+  - make race
+  - make cover
+  - make bench
+
 after_success:
   - go get -v github.com/mattn/goveralls
   - export PATH=$PATH:$HOME/gopath/bin
