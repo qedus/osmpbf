@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -161,6 +162,7 @@ func TestDecode(t *testing.T) {
 	defer f.Close()
 
 	d := NewDecoder(f)
+	d.SetBufferSize(1)
 	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		t.Fatal(err)
@@ -240,6 +242,7 @@ func TestDecodeConcurrent(t *testing.T) {
 	defer f.Close()
 
 	d := NewDecoder(f)
+	d.SetBufferSize(1)
 	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		t.Fatal(err)
@@ -313,11 +316,16 @@ func BenchmarkDecode(b *testing.B) {
 	}
 	defer f.Close()
 
+	blobBufferSize, _ := strconv.Atoi(os.Getenv("OSMPBF_BENCHMARK_BUFFER"))
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		f.Seek(0, 0)
 
 		d := NewDecoder(f)
+		if blobBufferSize > 0 {
+			d.SetBufferSize(blobBufferSize)
+		}
 		err = d.Start(runtime.GOMAXPROCS(-1))
 		if err != nil {
 			b.Fatal(err)
@@ -360,11 +368,16 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 	}
 	defer f.Close()
 
+	blobBufferSize, _ := strconv.Atoi(os.Getenv("OSMPBF_BENCHMARK_BUFFER"))
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		f.Seek(0, 0)
 
 		d := NewDecoder(f)
+		if blobBufferSize > 0 {
+			d.SetBufferSize(blobBufferSize)
+		}
 		err = d.Start(runtime.GOMAXPROCS(-1))
 		if err != nil {
 			b.Fatal(err)

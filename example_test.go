@@ -2,11 +2,12 @@ package osmpbf_test
 
 import (
 	"fmt"
-	"github.com/qedus/osmpbf"
 	"io"
 	"log"
 	"os"
 	"runtime"
+
+	"github.com/qedus/osmpbf"
 )
 
 // Don't forget to sync with README.md
@@ -19,7 +20,12 @@ func Example() {
 	defer f.Close()
 
 	d := osmpbf.NewDecoder(f)
-	err = d.Start(runtime.GOMAXPROCS(-1)) // use several goroutines for faster decoding
+
+	// use more memory from the start, it is faster
+	d.SetBufferSize(osmpbf.MaxBlobSize)
+
+	// start decoding with several goroutines, it is faster
+	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		log.Fatal(err)
 	}

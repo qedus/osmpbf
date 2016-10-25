@@ -19,7 +19,11 @@ import (
 
 const (
 	maxBlobHeaderSize = 64 * 1024
-	maxBlobSize       = 32 * 1024 * 1024
+
+	initialBlobBufSize = 1 * 1024 * 1024
+
+	// MaxBlobSize is maximum supported blob size.
+	MaxBlobSize = 32 * 1024 * 1024
 )
 
 var (
@@ -84,6 +88,8 @@ type Decoder struct {
 	r          io.Reader
 	serializer chan pair
 
+	buf *bytes.Buffer
+
 	// for data decoders
 	inputs  []chan<- pair
 	outputs []<-chan pair
@@ -91,10 +97,19 @@ type Decoder struct {
 
 // NewDecoder returns a new decoder that reads from r.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{
+	d := &Decoder{
 		r:          r,
 		serializer: make(chan pair, 8000), // typical PrimitiveBlock contains 8k OSM entities
 	}
+	d.SetBufferSize(initialBlobBufSize)
+	return d
+}
+
+// SetBufferSize sets initial size of decoding buffer. Default value is 1MB, you can set higher value
+// (for example, MaxBlobSize) for (probably) faster decoding, or lower value for reduced memory consumption.
+// Any value will produce valid results; buffer will grow automatically if required.
+func (dec *Decoder) SetBufferSize(n int) {
+	dec.buf = bytes.NewBuffer(make([]byte, 0, n))
 }
 
 // Start decoding process using n goroutines.
@@ -190,7 +205,7 @@ func (dec *Decoder) Start(n int) error {
 }
 
 // Decode reads the next object from the input stream and returns either a
-// Node, Way or Relation struct representing the underlying OpenStreetMap PBF
+// pointer to Node, Way or Relation struct representing the underlying OpenStreetMap PBF
 // data, or error encountered. The end of the input stream is reported by an io.EOF error.
 //
 // Decode is safe for parallel execution. Only first error encountered will be returned,
@@ -223,11 +238,12 @@ func (dec *Decoder) readFileBlock() (*OSMPBF.BlobHeader, *OSMPBF.Blob, error) {
 }
 
 func (dec *Decoder) readBlobHeaderSize() (uint32, error) {
-	buf := make([]byte, 4)
-	if _, err := io.ReadFull(dec.r, buf); err != nil {
+	dec.buf.Reset()
+	if _, err := io.CopyN(dec.buf, dec.r, 4); err != nil {
 		return 0, err
 	}
-	size := binary.BigEndian.Uint32(buf)
+
+	size := binary.BigEndian.Uint32(dec.buf.Bytes())
 
 	if size >= maxBlobHeaderSize {
 		return 0, errors.New("BlobHeader size >= 64Kb")
@@ -236,30 +252,30 @@ func (dec *Decoder) readBlobHeaderSize() (uint32, error) {
 }
 
 func (dec *Decoder) readBlobHeader(size uint32) (*OSMPBF.BlobHeader, error) {
-	buf := make([]byte, size)
-	if _, err := io.ReadFull(dec.r, buf); err != nil {
+	dec.buf.Reset()
+	if _, err := io.CopyN(dec.buf, dec.r, int64(size)); err != nil {
 		return nil, err
 	}
 
 	blobHeader := new(OSMPBF.BlobHeader)
-	if err := proto.Unmarshal(buf, blobHeader); err != nil {
+	if err := proto.Unmarshal(dec.buf.Bytes(), blobHeader); err != nil {
 		return nil, err
 	}
 
-	if blobHeader.GetDatasize() >= maxBlobSize {
+	if blobHeader.GetDatasize() >= MaxBlobSize {
 		return nil, errors.New("Blob size >= 32Mb")
 	}
 	return blobHeader, nil
 }
 
 func (dec *Decoder) readBlob(blobHeader *OSMPBF.BlobHeader) (*OSMPBF.Blob, error) {
-	buf := make([]byte, blobHeader.GetDatasize())
-	if _, err := io.ReadFull(dec.r, buf); err != nil {
+	dec.buf.Reset()
+	if _, err := io.CopyN(dec.buf, dec.r, int64(blobHeader.GetDatasize())); err != nil {
 		return nil, err
 	}
 
 	blob := new(OSMPBF.Blob)
-	if err := proto.Unmarshal(buf, blob); err != nil {
+	if err := proto.Unmarshal(dec.buf.Bytes(), blob); err != nil {
 		return nil, err
 	}
 	return blob, nil
