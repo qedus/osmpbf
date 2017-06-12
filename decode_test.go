@@ -168,7 +168,7 @@ func downloadTestOSMFile(t *testing.T) {
 }
 
 func checkHeader(a *Header) bool {
-	if a == nil || a.Bbox == nil || a.RequiredFeatures == nil || a.WritingProgram == nil {
+	if a == nil || a.Bbox == nil || a.RequiredFeatures == nil {
 		return false
 	}
 

@@ -12,10 +12,10 @@ import (
 	"fmt"
 	"io"
 	"time"
+	"sync"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/qedus/osmpbf/OSMPBF"
-	"sync"
 )
 
 const (
@@ -112,7 +112,7 @@ type Decoder struct {
 	// store header block
 	header *Header
 	// synchronize header deserialization
-	mu sync.Mutex
+	headerOnce sync.Once
 
 	// for data decoders
 	inputs  []chan<- pair
@@ -138,18 +138,10 @@ func (dec *Decoder) SetBufferSize(n int) {
 
 // Get the file header
 func (dec *Decoder) Header() (*Header, error) {
-	// synchronize with possible simultaneous call to 'Start()'
-	dec.mu.Lock()
-	defer dec.mu.Unlock()
-
-	// if we didn't yet decode the header we will do that now
-	if dec.header == nil {
-		// deserialize the file header
-		var err error
-		dec.header, err = dec.readOSMHeader()
-		if err != nil {
-			return nil, err
-		}
+	// deserialize the file header
+	err := dec.readOSMHeader()
+	if err != nil {
+		return nil, err
 	}
 
 	return dec.header, nil
@@ -161,17 +153,9 @@ func (dec *Decoder) Start(n int) error {
 		n = 1
 	}
 
-	// synchronize with possible simultaneous call to 'Header()'
-	dec.mu.Lock()
-	defer dec.mu.Unlock()
-
-	var err error
-	if dec.header == nil {
-		// read OSMHeader if this did not happen yet
-		dec.header, err = dec.readOSMHeader()
-		if err != nil {
-			return err
-		}
+	err := dec.readOSMHeader()
+	if err != nil {
+		return err
 	}
 
 	// start data decoders
@@ -352,35 +336,38 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 	}
 }
 
-func (dec *Decoder) readOSMHeader() (*Header, error) {
-	blobHeader, blob, err := dec.readFileBlock()
-	if err == nil {
-		if blobHeader.GetType() == "OSMHeader" {
-			return decodeOSMHeader(blob)
-		} else {
-			err = fmt.Errorf("unexpected first fileblock of type %s", blobHeader.GetType())
+func (dec *Decoder) readOSMHeader() error {
+	var err error
+	dec.headerOnce.Do(func() {
+		blobHeader, blob, err := dec.readFileBlock()
+		if err == nil {
+			if blobHeader.GetType() == "OSMHeader" {
+				err = dec.decodeOSMHeader(blob)
+			} else {
+				err = fmt.Errorf("unexpected first fileblock of type %s", blobHeader.GetType())
+			}
 		}
-	}
+	})
 
-	return nil, err
+	return err
 }
 
-func decodeOSMHeader(blob *OSMPBF.Blob) (*Header, error) {
+func (dec *Decoder) decodeOSMHeader(blob *OSMPBF.Blob) error {
 	data, err := getData(blob)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	headerBlock := new(OSMPBF.HeaderBlock)
 	if err := proto.Unmarshal(data, headerBlock); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Check we have the parse capabilities
 	requiredFeatures := headerBlock.GetRequiredFeatures()
 	for _, feature := range requiredFeatures {
 		if !parseCapabilities[feature] {
-			return nil, fmt.Errorf("parser does not have %s capability", feature)
+			return fmt.Errorf("parser does not have %s capability", feature)
 		}
 	}
 
@@ -409,5 +396,7 @@ func decodeOSMHeader(blob *OSMPBF.Blob) (*Header, error) {
 		}
 	}
 
-	return header, nil
+	dec.header = header
+
+	return nil
 }
