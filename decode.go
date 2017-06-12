@@ -35,21 +35,21 @@ var (
 )
 
 type Bbox struct {
-	Left float64
-	Right float64
-	Top float64
+	Left   float64
+	Right  float64
+	Top    float64
 	Bottom float64
 }
 
 type Header struct {
-	Bbox *Bbox
-	RequiredFeatures []string
-	OptionalFeatures []string
-	WritingProgram string
-	Source string
-	OsmosisReplicationTimestamp time.Time
+	Bbox                             *Bbox
+	RequiredFeatures                 []string
+	OptionalFeatures                 []string
+	WritingProgram                   string
+	Source                           string
+	OsmosisReplicationTimestamp      time.Time
 	OsmosisReplicationSequenceNumber int64
-	OsmosisReplicationBaseUrl string
+	OsmosisReplicationBaseUrl        string
 }
 
 type Info struct {
@@ -353,7 +353,7 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 }
 
 func (dec *Decoder) readOSMHeader() (*Header, error) {
-	blobHeader, blob, err :=  dec.readFileBlock()
+	blobHeader, blob, err := dec.readFileBlock()
 	if err == nil {
 		if blobHeader.GetType() == "OSMHeader" {
 			return decodeOSMHeader(blob)
@@ -388,9 +388,9 @@ func decodeOSMHeader(blob *OSMPBF.Blob) (*Header, error) {
 	header := &Header{
 		RequiredFeatures: headerBlock.GetRequiredFeatures(),
 		OptionalFeatures: headerBlock.GetOptionalFeatures(),
-		WritingProgram: headerBlock.GetWritingprogram(),
-		Source: headerBlock.GetSource(),
-		OsmosisReplicationBaseUrl: headerBlock.GetOsmosisReplicationBaseUrl(),
+		WritingProgram:   headerBlock.GetWritingprogram(),
+		Source:           headerBlock.GetSource(),
+		OsmosisReplicationBaseUrl:        headerBlock.GetOsmosisReplicationBaseUrl(),
 		OsmosisReplicationSequenceNumber: headerBlock.GetOsmosisReplicationSequenceNumber(),
 	}
 
@@ -402,10 +402,10 @@ func decodeOSMHeader(blob *OSMPBF.Blob) (*Header, error) {
 	if headerBlock.Bbox != nil {
 		// Units are always in nanodegree and do not obey granularity rules. See osmformat.proto
 		header.Bbox = &Bbox{
-			Left: 1e-9 * float64(*headerBlock.Bbox.Left),
-			Right: 1e-9 * float64(*headerBlock.Bbox.Right),
+			Left:   1e-9 * float64(*headerBlock.Bbox.Left),
+			Right:  1e-9 * float64(*headerBlock.Bbox.Right),
 			Bottom: 1e-9 * float64(*headerBlock.Bbox.Bottom),
-			Top: 1e-9 * float64(*headerBlock.Bbox.Top),
+			Top:    1e-9 * float64(*headerBlock.Bbox.Top),
 		}
 	}
 

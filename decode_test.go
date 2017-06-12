@@ -59,13 +59,13 @@ var (
 
 	eh = &Header{
 		Bbox: &Bbox{
-			Right: 0.335437,
-			Left: -0.511482,
+			Right:  0.335437,
+			Left:   -0.511482,
 			Bottom: 51.28554,
-			Top: 51.69344,
+			Top:    51.69344,
 		},
 		OsmosisReplicationTimestamp: time.Date(2014, 3, 24, 22, 55, 2, 0, time.FixedZone("test", 3600)),
-		RequiredFeatures: []string {
+		RequiredFeatures: []string{
 			"OsmSchema-V0.6",
 			"DenseNodes",
 		},
