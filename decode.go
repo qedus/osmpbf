@@ -15,6 +15,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/qedus/osmpbf/OSMPBF"
+	"sync"
 )
 
 const (
@@ -32,6 +33,24 @@ var (
 		"DenseNodes":     true,
 	}
 )
+
+type Bbox struct {
+	Left float64
+	Right float64
+	Top float64
+	Bottom float64
+}
+
+type Header struct {
+	Bbox *Bbox
+	RequiredFeatures []string
+	OptionalFeatures []string
+	WritingProgram string
+	Source string
+	OsmosisReplicationTimestamp time.Time
+	OsmosisReplicationSequenceNumber int64
+	OsmosisReplicationBaseUrl string
+}
 
 type Info struct {
 	Version   int32
@@ -90,6 +109,11 @@ type Decoder struct {
 
 	buf *bytes.Buffer
 
+	// store header block
+	header *Header
+	// synchronize header deserialization
+	mu sync.Mutex
+
 	// for data decoders
 	inputs  []chan<- pair
 	outputs []<-chan pair
@@ -112,23 +136,42 @@ func (dec *Decoder) SetBufferSize(n int) {
 	dec.buf = bytes.NewBuffer(make([]byte, 0, n))
 }
 
+// Get the file header
+func (dec *Decoder) Header() (*Header, error) {
+	// synchronize with possible simultaneous call to 'Start()'
+	dec.mu.Lock()
+	defer dec.mu.Unlock()
+
+	// if we didn't yet decode the header we will do that now
+	if dec.header == nil {
+		// deserialize the file header
+		var err error
+		dec.header, err = dec.readOSMHeader()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return dec.header, nil
+}
+
 // Start decoding process using n goroutines.
 func (dec *Decoder) Start(n int) error {
 	if n < 1 {
 		n = 1
 	}
 
-	// read OSMHeader
-	blobHeader, blob, err := dec.readFileBlock()
-	if err == nil {
-		if blobHeader.GetType() == "OSMHeader" {
-			err = decodeOSMHeader(blob)
-		} else {
-			err = fmt.Errorf("unexpected first fileblock of type %s", blobHeader.GetType())
+	// synchronize with possible simultaneous call to 'Header()'
+	dec.mu.Lock()
+	defer dec.mu.Unlock()
+
+	var err error
+	if dec.header == nil {
+		// read OSMHeader if this did not happen yet
+		dec.header, err = dec.readOSMHeader()
+		if err != nil {
+			return err
 		}
-	}
-	if err != nil {
-		return err
 	}
 
 	// start data decoders
@@ -157,6 +200,8 @@ func (dec *Decoder) Start(n int) error {
 	// start reading OSMData
 	go func() {
 		var inputIndex int
+		var blobHeader *OSMPBF.BlobHeader
+		var blob *OSMPBF.Blob
 		for {
 			input := dec.inputs[inputIndex]
 			inputIndex = (inputIndex + 1) % n
@@ -307,24 +352,62 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 	}
 }
 
-func decodeOSMHeader(blob *OSMPBF.Blob) error {
+func (dec *Decoder) readOSMHeader() (*Header, error) {
+	blobHeader, blob, err :=  dec.readFileBlock()
+	if err == nil {
+		if blobHeader.GetType() == "OSMHeader" {
+			return decodeOSMHeader(blob)
+		} else {
+			err = fmt.Errorf("unexpected first fileblock of type %s", blobHeader.GetType())
+		}
+	}
+
+	return nil, err
+}
+
+func decodeOSMHeader(blob *OSMPBF.Blob) (*Header, error) {
 	data, err := getData(blob)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	headerBlock := new(OSMPBF.HeaderBlock)
 	if err := proto.Unmarshal(data, headerBlock); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Check we have the parse capabilities
 	requiredFeatures := headerBlock.GetRequiredFeatures()
 	for _, feature := range requiredFeatures {
 		if !parseCapabilities[feature] {
-			return fmt.Errorf("parser does not have %s capability", feature)
+			return nil, fmt.Errorf("parser does not have %s capability", feature)
 		}
 	}
 
-	return nil
+	// Read properties to header struct
+	header := &Header{
+		RequiredFeatures: headerBlock.GetRequiredFeatures(),
+		OptionalFeatures: headerBlock.GetOptionalFeatures(),
+		WritingProgram: headerBlock.GetWritingprogram(),
+		Source: headerBlock.GetSource(),
+		OsmosisReplicationBaseUrl: headerBlock.GetOsmosisReplicationBaseUrl(),
+		OsmosisReplicationSequenceNumber: headerBlock.GetOsmosisReplicationSequenceNumber(),
+	}
+
+	// convert timestamp epoch seconds to golang time structure if it exists
+	if headerBlock.OsmosisReplicationTimestamp != nil {
+		header.OsmosisReplicationTimestamp = time.Unix(*headerBlock.OsmosisReplicationTimestamp, 0)
+	}
+	// read bounding box if it exists
+	if headerBlock.Bbox != nil {
+		// Units are always in nanodegree and do not obey granularity rules. See osmformat.proto
+		header.Bbox = &Bbox{
+			Left: 1e-9 * float64(*headerBlock.Bbox.Left),
+			Right: 1e-9 * float64(*headerBlock.Bbox.Right),
+			Bottom: 1e-9 * float64(*headerBlock.Bbox.Bottom),
+			Top: 1e-9 * float64(*headerBlock.Bbox.Top),
+		}
+	}
+
+	return header, nil
 }
