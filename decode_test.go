@@ -58,7 +58,7 @@ var (
 	erc uint64 = 12833
 
 	eh = &Header{
-		Bbox: &Bbox{
+		BoundingBox: &Bbox{
 			Right:  0.335437,
 			Left:   -0.511482,
 			Bottom: 51.28554,
@@ -168,12 +168,12 @@ func downloadTestOSMFile(t *testing.T) {
 }
 
 func checkHeader(a *Header) bool {
-	if a == nil || a.Bbox == nil || a.RequiredFeatures == nil {
+	if a == nil || a.BoundingBox == nil || a.RequiredFeatures == nil {
 		return false
 	}
 
 	// check bbox
-	if a.Bbox.Right != eh.Bbox.Right || a.Bbox.Left != eh.Bbox.Left || a.Bbox.Top != eh.Bbox.Top || a.Bbox.Bottom != eh.Bbox.Bottom {
+	if a.BoundingBox.Right != eh.BoundingBox.Right || a.BoundingBox.Left != eh.BoundingBox.Left || a.BoundingBox.Top != eh.BoundingBox.Top || a.BoundingBox.Bottom != eh.BoundingBox.Bottom {
 		return false
 	}
 

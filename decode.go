@@ -11,8 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/qedus/osmpbf/OSMPBF"
@@ -42,7 +42,7 @@ type Bbox struct {
 }
 
 type Header struct {
-	Bbox                             *Bbox
+	BoundingBox                      *Bbox
 	RequiredFeatures                 []string
 	OptionalFeatures                 []string
 	WritingProgram                   string
@@ -139,12 +139,7 @@ func (dec *Decoder) SetBufferSize(n int) {
 // Get the file header
 func (dec *Decoder) Header() (*Header, error) {
 	// deserialize the file header
-	err := dec.readOSMHeader()
-	if err != nil {
-		return nil, err
-	}
-
-	return dec.header, nil
+	return dec.header, dec.readOSMHeader()
 }
 
 // Start decoding process using n goroutines.
@@ -153,8 +148,7 @@ func (dec *Decoder) Start(n int) error {
 		n = 1
 	}
 
-	err := dec.readOSMHeader()
-	if err != nil {
+	if err := dec.readOSMHeader(); err != nil {
 		return err
 	}
 
@@ -184,13 +178,11 @@ func (dec *Decoder) Start(n int) error {
 	// start reading OSMData
 	go func() {
 		var inputIndex int
-		var blobHeader *OSMPBF.BlobHeader
-		var blob *OSMPBF.Blob
 		for {
 			input := dec.inputs[inputIndex]
 			inputIndex = (inputIndex + 1) % n
 
-			blobHeader, blob, err = dec.readFileBlock()
+			blobHeader, blob, err := dec.readFileBlock()
 			if err == nil && blobHeader.GetType() != "OSMData" {
 				err = fmt.Errorf("unexpected fileblock of type %s", blobHeader.GetType())
 			}
@@ -388,7 +380,7 @@ func (dec *Decoder) decodeOSMHeader(blob *OSMPBF.Blob) error {
 	// read bounding box if it exists
 	if headerBlock.Bbox != nil {
 		// Units are always in nanodegree and do not obey granularity rules. See osmformat.proto
-		header.Bbox = &Bbox{
+		header.BoundingBox = &Bbox{
 			Left:   1e-9 * float64(*headerBlock.Bbox.Left),
 			Right:  1e-9 * float64(*headerBlock.Bbox.Right),
 			Bottom: 1e-9 * float64(*headerBlock.Bbox.Bottom),
