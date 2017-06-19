@@ -34,7 +34,7 @@ var (
 	}
 )
 
-type Bbox struct {
+type BoundingBox struct {
 	Left   float64
 	Right  float64
 	Top    float64
@@ -42,7 +42,7 @@ type Bbox struct {
 }
 
 type Header struct {
-	BoundingBox                      *Bbox
+	BoundingBox                      *BoundingBox
 	RequiredFeatures                 []string
 	OptionalFeatures                 []string
 	WritingProgram                   string
@@ -380,7 +380,7 @@ func (dec *Decoder) decodeOSMHeader(blob *OSMPBF.Blob) error {
 	// read bounding box if it exists
 	if headerBlock.Bbox != nil {
 		// Units are always in nanodegree and do not obey granularity rules. See osmformat.proto
-		header.BoundingBox = &Bbox{
+		header.BoundingBox = &BoundingBox{
 			Left:   1e-9 * float64(*headerBlock.Bbox.Left),
 			Right:  1e-9 * float64(*headerBlock.Bbox.Right),
 			Bottom: 1e-9 * float64(*headerBlock.Bbox.Bottom),

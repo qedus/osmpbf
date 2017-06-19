@@ -58,7 +58,7 @@ var (
 	erc uint64 = 12833
 
 	eh = &Header{
-		BoundingBox: &Bbox{
+		BoundingBox: &BoundingBox{
 			Right:  0.335437,
 			Left:   -0.511482,
 			Bottom: 51.28554,
