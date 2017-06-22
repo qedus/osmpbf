@@ -331,7 +331,9 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 func (dec *Decoder) readOSMHeader() error {
 	var err error
 	dec.headerOnce.Do(func() {
-		blobHeader, blob, err := dec.readFileBlock()
+		var blobHeader *OSMPBF.BlobHeader
+		var blob *OSMPBF.Blob
+		blobHeader, blob, err = dec.readFileBlock()
 		if err == nil {
 			if blobHeader.GetType() == "OSMHeader" {
 				err = dec.decodeOSMHeader(blob)
