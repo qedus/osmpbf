@@ -57,6 +57,21 @@ var (
 	ewc uint64 = 459055
 	erc uint64 = 12833
 
+	eh = &Header{
+		BoundingBox: &BoundingBox{
+			Right:  0.335437,
+			Left:   -0.511482,
+			Bottom: 51.28554,
+			Top:    51.69344,
+		},
+		OsmosisReplicationTimestamp: time.Date(2014, 3, 24, 22, 55, 2, 0, time.FixedZone("test", 3600)),
+		RequiredFeatures: []string{
+			"OsmSchema-V0.6",
+			"DenseNodes",
+		},
+		WritingProgram: `Osmium (http:\/\/wiki.openstreetmap.org\/wiki\/Osmium)`,
+	}
+
 	en = &Node{
 		ID:  18088578,
 		Lat: 51.5442632,
@@ -152,6 +167,34 @@ func downloadTestOSMFile(t *testing.T) {
 	}
 }
 
+func checkHeader(a *Header) bool {
+	if a == nil || a.BoundingBox == nil || a.RequiredFeatures == nil {
+		return false
+	}
+
+	// check bbox
+	if a.BoundingBox.Right != eh.BoundingBox.Right || a.BoundingBox.Left != eh.BoundingBox.Left || a.BoundingBox.Top != eh.BoundingBox.Top || a.BoundingBox.Bottom != eh.BoundingBox.Bottom {
+		return false
+	}
+
+	// check timestamp
+	if !a.OsmosisReplicationTimestamp.Equal(eh.OsmosisReplicationTimestamp) {
+		return false
+	}
+
+	// check writing program
+	if a.WritingProgram != eh.WritingProgram {
+		return false
+	}
+
+	// check features
+	if len(a.RequiredFeatures) != len(eh.RequiredFeatures) || a.RequiredFeatures[0] != eh.RequiredFeatures[0] || a.RequiredFeatures[1] != eh.RequiredFeatures[1] {
+		return false
+	}
+
+	return true
+}
+
 func TestDecode(t *testing.T) {
 	downloadTestOSMFile(t)
 
@@ -163,6 +206,15 @@ func TestDecode(t *testing.T) {
 
 	d := NewDecoder(f)
 	d.SetBufferSize(1)
+
+	header, err := d.Header()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checkHeader(header) {
+		t.Errorf("\nExpected: %#v\nActual:   %#v", eh, header)
+	}
+
 	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		t.Fatal(err)
@@ -246,6 +298,14 @@ func TestDecodeConcurrent(t *testing.T) {
 	err = d.Start(runtime.GOMAXPROCS(-1))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	header, err := d.Header()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checkHeader(header) {
+		t.Errorf("\nExpected: %#v\nActual:   %#v", eh, header)
 	}
 
 	var n *Node

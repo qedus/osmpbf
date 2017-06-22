@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -32,6 +33,24 @@ var (
 		"DenseNodes":     true,
 	}
 )
+
+type BoundingBox struct {
+	Left   float64
+	Right  float64
+	Top    float64
+	Bottom float64
+}
+
+type Header struct {
+	BoundingBox                      *BoundingBox
+	RequiredFeatures                 []string
+	OptionalFeatures                 []string
+	WritingProgram                   string
+	Source                           string
+	OsmosisReplicationTimestamp      time.Time
+	OsmosisReplicationSequenceNumber int64
+	OsmosisReplicationBaseUrl        string
+}
 
 type Info struct {
 	Version   int32
@@ -90,6 +109,11 @@ type Decoder struct {
 
 	buf *bytes.Buffer
 
+	// store header block
+	header *Header
+	// synchronize header deserialization
+	headerOnce sync.Once
+
 	// for data decoders
 	inputs  []chan<- pair
 	outputs []<-chan pair
@@ -112,22 +136,19 @@ func (dec *Decoder) SetBufferSize(n int) {
 	dec.buf = bytes.NewBuffer(make([]byte, 0, n))
 }
 
+// Get the file header
+func (dec *Decoder) Header() (*Header, error) {
+	// deserialize the file header
+	return dec.header, dec.readOSMHeader()
+}
+
 // Start decoding process using n goroutines.
 func (dec *Decoder) Start(n int) error {
 	if n < 1 {
 		n = 1
 	}
 
-	// read OSMHeader
-	blobHeader, blob, err := dec.readFileBlock()
-	if err == nil {
-		if blobHeader.GetType() == "OSMHeader" {
-			err = decodeOSMHeader(blob)
-		} else {
-			err = fmt.Errorf("unexpected first fileblock of type %s", blobHeader.GetType())
-		}
-	}
-	if err != nil {
+	if err := dec.readOSMHeader(); err != nil {
 		return err
 	}
 
@@ -161,7 +182,7 @@ func (dec *Decoder) Start(n int) error {
 			input := dec.inputs[inputIndex]
 			inputIndex = (inputIndex + 1) % n
 
-			blobHeader, blob, err = dec.readFileBlock()
+			blobHeader, blob, err := dec.readFileBlock()
 			if err == nil && blobHeader.GetType() != "OSMData" {
 				err = fmt.Errorf("unexpected fileblock of type %s", blobHeader.GetType())
 			}
@@ -307,7 +328,25 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 	}
 }
 
-func decodeOSMHeader(blob *OSMPBF.Blob) error {
+func (dec *Decoder) readOSMHeader() error {
+	var err error
+	dec.headerOnce.Do(func() {
+		var blobHeader *OSMPBF.BlobHeader
+		var blob *OSMPBF.Blob
+		blobHeader, blob, err = dec.readFileBlock()
+		if err == nil {
+			if blobHeader.GetType() == "OSMHeader" {
+				err = dec.decodeOSMHeader(blob)
+			} else {
+				err = fmt.Errorf("unexpected first fileblock of type %s", blobHeader.GetType())
+			}
+		}
+	})
+
+	return err
+}
+
+func (dec *Decoder) decodeOSMHeader(blob *OSMPBF.Blob) error {
 	data, err := getData(blob)
 	if err != nil {
 		return err
@@ -325,6 +364,33 @@ func decodeOSMHeader(blob *OSMPBF.Blob) error {
 			return fmt.Errorf("parser does not have %s capability", feature)
 		}
 	}
+
+	// Read properties to header struct
+	header := &Header{
+		RequiredFeatures: headerBlock.GetRequiredFeatures(),
+		OptionalFeatures: headerBlock.GetOptionalFeatures(),
+		WritingProgram:   headerBlock.GetWritingprogram(),
+		Source:           headerBlock.GetSource(),
+		OsmosisReplicationBaseUrl:        headerBlock.GetOsmosisReplicationBaseUrl(),
+		OsmosisReplicationSequenceNumber: headerBlock.GetOsmosisReplicationSequenceNumber(),
+	}
+
+	// convert timestamp epoch seconds to golang time structure if it exists
+	if headerBlock.OsmosisReplicationTimestamp != nil {
+		header.OsmosisReplicationTimestamp = time.Unix(*headerBlock.OsmosisReplicationTimestamp, 0)
+	}
+	// read bounding box if it exists
+	if headerBlock.Bbox != nil {
+		// Units are always in nanodegree and do not obey granularity rules. See osmformat.proto
+		header.BoundingBox = &BoundingBox{
+			Left:   1e-9 * float64(*headerBlock.Bbox.Left),
+			Right:  1e-9 * float64(*headerBlock.Bbox.Right),
+			Bottom: 1e-9 * float64(*headerBlock.Bbox.Bottom),
+			Top:    1e-9 * float64(*headerBlock.Bbox.Top),
+		}
+	}
+
+	dec.header = header
 
 	return nil
 }
