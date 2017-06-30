@@ -386,7 +386,9 @@ func BenchmarkDecode(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		f.Seek(0, 0)
+		if _, err = f.Seek(0, 0); err != nil {
+			b.Fatal(err)
+		}
 
 		d := NewDecoder(f)
 		if blobBufferSize > 0 {
@@ -438,7 +440,9 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		f.Seek(0, 0)
+		if _, err = f.Seek(0, 0); err != nil {
+			b.Fatal(err)
+		}
 
 		d := NewDecoder(f)
 		if blobBufferSize > 0 {
