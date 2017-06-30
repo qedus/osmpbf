@@ -419,7 +419,7 @@ func BenchmarkDecode(b *testing.B) {
 		}
 
 		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
-			time.Now().Sub(start).Seconds(), nc, wc, rc)
+			time.Since(start).Seconds(), nc, wc, rc)
 	}
 }
 
@@ -483,6 +483,6 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 		wg.Wait()
 
 		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
-			time.Now().Sub(start).Seconds(), nc, wc, rc)
+			time.Since(start).Seconds(), nc, wc, rc)
 	}
 }
