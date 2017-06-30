@@ -54,9 +54,9 @@ type Header struct {
 
 type Info struct {
 	Version   int32
+	Uid       int32
 	Timestamp time.Time
 	Changeset int64
-	Uid       int32
 	User      string
 	Visible   bool
 }
