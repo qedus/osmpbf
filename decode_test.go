@@ -142,27 +142,31 @@ func init() {
 }
 
 func downloadTestOSMFile(t *testing.T) {
-	if _, err := os.Stat(London); os.IsNotExist(err) {
-		resp, err := http.Get(LondonURL)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
+	_, err := os.Stat(London)
+	if err == nil {
+		return
+	}
+	if !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
 
-		if resp.StatusCode != 200 {
-			t.Fatalf("expected 200, got %d", resp.StatusCode)
-		}
+	resp, err := http.Get(LondonURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
 
-		out, err := os.Create(London)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer out.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
 
-		if _, err = io.Copy(out, resp.Body); err != nil {
-			t.Fatal(err)
-		}
-	} else if err != nil {
+	out, err := os.Create(London)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+
+	if _, err = io.Copy(out, resp.Body); err != nil {
 		t.Fatal(err)
 	}
 }
