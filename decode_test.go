@@ -321,11 +321,14 @@ func TestDecodeConcurrent(t *testing.T) {
 		wg.Add(1)
 
 		go func() {
+			defer wg.Done()
+
 			for {
 				if v, err := d.Decode(); err == io.EOF {
-					break
+					return
 				} else if err != nil {
-					t.Fatal(err)
+					t.Error(err)
+					return
 				} else {
 					switch v := v.(type) {
 					case *Node:
@@ -344,12 +347,11 @@ func TestDecodeConcurrent(t *testing.T) {
 							r = v
 						}
 					default:
-						t.Fatalf("unknown type %T", v)
+						t.Errorf("unknown type %T", v)
+						return
 					}
 				}
 			}
-
-			wg.Done()
 		}()
 	}
 	wg.Wait()
@@ -454,11 +456,14 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 			wg.Add(1)
 
 			go func() {
+				defer wg.Done()
+
 				for {
 					if v, err := d.Decode(); err == io.EOF {
-						break
+						return
 					} else if err != nil {
-						b.Fatal(err)
+						b.Error(err)
+						return
 					} else {
 						switch v := v.(type) {
 						case *Node:
@@ -468,12 +473,11 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 						case *Relation:
 							atomic.AddUint64(&rc, 1)
 						default:
-							b.Fatalf("unknown type %T", v)
+							b.Errorf("unknown type %T", v)
+							return
 						}
 					}
 				}
-
-				wg.Done()
 			}()
 		}
 		wg.Wait()
