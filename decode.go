@@ -54,9 +54,9 @@ type Header struct {
 
 type Info struct {
 	Version   int32
+	Uid       int32
 	Timestamp time.Time
 	Changeset int64
-	Uid       int32
 	User      string
 	Visible   bool
 }
@@ -136,7 +136,7 @@ func (dec *Decoder) SetBufferSize(n int) {
 	dec.buf = bytes.NewBuffer(make([]byte, 0, n))
 }
 
-// Get the file header
+// Header returns file header.
 func (dec *Decoder) Header() (*Header, error) {
 	// deserialize the file header
 	return dec.header, dec.readOSMHeader()

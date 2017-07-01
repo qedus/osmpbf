@@ -142,27 +142,31 @@ func init() {
 }
 
 func downloadTestOSMFile(t *testing.T) {
-	if _, err := os.Stat(London); os.IsNotExist(err) {
-		resp, err := http.Get(LondonURL)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
+	_, err := os.Stat(London)
+	if err == nil {
+		return
+	}
+	if !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
 
-		if resp.StatusCode != 200 {
-			t.Fatalf("expected 200, got %d", resp.StatusCode)
-		}
+	resp, err := http.Get(LondonURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
 
-		out, err := os.Create(London)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer out.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
 
-		if _, err = io.Copy(out, resp.Body); err != nil {
-			t.Fatal(err)
-		}
-	} else if err != nil {
+	out, err := os.Create(London)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+
+	if _, err = io.Copy(out, resp.Body); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -317,11 +321,14 @@ func TestDecodeConcurrent(t *testing.T) {
 		wg.Add(1)
 
 		go func() {
+			defer wg.Done()
+
 			for {
 				if v, err := d.Decode(); err == io.EOF {
-					break
+					return
 				} else if err != nil {
-					t.Fatal(err)
+					t.Error(err)
+					return
 				} else {
 					switch v := v.(type) {
 					case *Node:
@@ -340,12 +347,11 @@ func TestDecodeConcurrent(t *testing.T) {
 							r = v
 						}
 					default:
-						t.Fatalf("unknown type %T", v)
+						t.Errorf("unknown type %T", v)
+						return
 					}
 				}
 			}
-
-			wg.Done()
 		}()
 	}
 	wg.Wait()
@@ -380,7 +386,9 @@ func BenchmarkDecode(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		f.Seek(0, 0)
+		if _, err = f.Seek(0, 0); err != nil {
+			b.Fatal(err)
+		}
 
 		d := NewDecoder(f)
 		if blobBufferSize > 0 {
@@ -413,7 +421,7 @@ func BenchmarkDecode(b *testing.B) {
 		}
 
 		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
-			time.Now().Sub(start).Seconds(), nc, wc, rc)
+			time.Since(start).Seconds(), nc, wc, rc)
 	}
 }
 
@@ -432,7 +440,9 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		f.Seek(0, 0)
+		if _, err = f.Seek(0, 0); err != nil {
+			b.Fatal(err)
+		}
 
 		d := NewDecoder(f)
 		if blobBufferSize > 0 {
@@ -450,11 +460,14 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 			wg.Add(1)
 
 			go func() {
+				defer wg.Done()
+
 				for {
 					if v, err := d.Decode(); err == io.EOF {
-						break
+						return
 					} else if err != nil {
-						b.Fatal(err)
+						b.Error(err)
+						return
 					} else {
 						switch v := v.(type) {
 						case *Node:
@@ -464,17 +477,16 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 						case *Relation:
 							atomic.AddUint64(&rc, 1)
 						default:
-							b.Fatalf("unknown type %T", v)
+							b.Errorf("unknown type %T", v)
+							return
 						}
 					}
 				}
-
-				wg.Done()
 			}()
 		}
 		wg.Wait()
 
 		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
-			time.Now().Sub(start).Seconds(), nc, wc, rc)
+			time.Since(start).Seconds(), nc, wc, rc)
 	}
 }
