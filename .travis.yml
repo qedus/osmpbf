@@ -10,9 +10,9 @@ go:
 
 install:
   - go get -v github.com/qedus/osmpbf
-  - go get -u golang.org/x/tools/cmd/benchcmp
 
 script:
+  - make init
   - make race
   - make cover
   - make bench
