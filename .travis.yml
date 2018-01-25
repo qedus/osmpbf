@@ -1,7 +1,6 @@
 language: go
 sudo: false
 go:
-  - 1.5.x
   - 1.6.x
   - 1.7.x
   - 1.8.x
@@ -10,9 +9,9 @@ go:
 
 install:
   - go get -v github.com/qedus/osmpbf
-  - go get -u golang.org/x/tools/cmd/benchcmp
 
 script:
+  - make init
   - make race
   - make cover
   - make bench
