@@ -19,6 +19,11 @@ const (
 	// Stored at https://gist.github.com/AlekSi/d4369aa13cf1fc5ddfac3e91b67b2f7b
 	London    = "greater-london-140324.osm.pbf"
 	LondonURL = "https://gist.githubusercontent.com/AlekSi/d4369aa13cf1fc5ddfac3e91b67b2f7b/raw/f87959d6c9466547d9759971e071a15049b67ae2/greater-london-140324.osm.pbf"
+
+	// Same file as above, but without 'DenseNodes'. This has been generated using the below command (using osmium-tool http://osmcode.org/osmium-tool/)
+	// "osmium cat -o  greater-london-140324-nondense.osm.pbf greater-london-140324.osm.pbf -f osm.pbf,pbf_dense_nodes=false"
+	LondonNonDense    = "greater-london-140324-nondense.osm.pbf"
+	LondonNonDenseURL = "https://gist.githubusercontent.com/clydedacruz/6263693f4facc28c84e768e708a489ff/raw/0f2ecad796a0234678c8fa6a0cc8fae376ead646/greater-london-140324-nondense.osm.pbf"
 )
 
 func parseTime(s string) time.Time {
@@ -141,8 +146,8 @@ func init() {
 	}
 }
 
-func downloadTestOSMFile(t *testing.T) {
-	_, err := os.Stat(London)
+func downloadTestOSMFile(fileName string, downloadURL string, t *testing.T) {
+	_, err := os.Stat(fileName)
 	if err == nil {
 		return
 	}
@@ -150,7 +155,7 @@ func downloadTestOSMFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := http.Get(LondonURL)
+	resp, err := http.Get(downloadURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +165,7 @@ func downloadTestOSMFile(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 
-	out, err := os.Create(London)
+	out, err := os.Create(fileName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,10 +204,10 @@ func checkHeader(a *Header) bool {
 	return true
 }
 
-func TestDecode(t *testing.T) {
-	downloadTestOSMFile(t)
+func decodePBF(PBFfileName string, fileDownloadURL string, t *testing.T) {
+	downloadTestOSMFile(PBFfileName, fileDownloadURL, t)
 
-	f, err := os.Open(London)
+	f, err := os.Open(PBFfileName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,8 +293,15 @@ func TestDecode(t *testing.T) {
 	}
 }
 
+func TestDecodePBFWithDenseNodes(t *testing.T) {
+	decodePBF(London, LondonURL, t)
+}
+
+func TestDecodePBFWithNodes(t *testing.T) {
+	decodePBF(LondonNonDense, LondonNonDenseURL, t)
+}
 func TestDecodeConcurrent(t *testing.T) {
-	downloadTestOSMFile(t)
+	downloadTestOSMFile(London, LondonURL, t)
 
 	f, err := os.Open(London)
 	if err != nil {
