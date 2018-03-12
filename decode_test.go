@@ -23,7 +23,7 @@ const (
 	// Same file as above, but without 'DenseNodes'. This has been generated using the below command (using osmium-tool http://osmcode.org/osmium-tool/)
 	// "osmium cat -o  greater-london-140324-nondense.osm.pbf greater-london-140324.osm.pbf -f osm.pbf,pbf_dense_nodes=false"
 	LondonNonDense    = "greater-london-140324-nondense.osm.pbf"
-	LondonNonDenseURL = "https://gist.githubusercontent.com/clydedacruz/6263693f4facc28c84e768e708a489ff/raw/0f2ecad796a0234678c8fa6a0cc8fae376ead646/greater-london-140324-nondense.osm.pbf"
+	LondonNonDenseURL = "https://gist.githubusercontent.com/AlekSi/d4369aa13cf1fc5ddfac3e91b67b2f7b/raw/8604f36a7357adfbd6b5292c2ea4972d9d0bfd3d/greater-london-140324-nondense.osm.pbf"
 )
 
 func parseTime(s string) time.Time {
