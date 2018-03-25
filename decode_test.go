@@ -15,10 +15,16 @@ import (
 )
 
 const (
+	// Test files are stored at https://gist.github.com/AlekSi/d4369aa13cf1fc5ddfac3e91b67b2f7b
+	// 8604f36a7357adfbd6b5292c2ea4972d9d0bfd3d is the latest commit.
+	GistURL = "https://gist.githubusercontent.com/AlekSi/d4369aa13cf1fc5ddfac3e91b67b2f7b/raw/8604f36a7357adfbd6b5292c2ea4972d9d0bfd3d/"
+
 	// Originally downloaded from http://download.geofabrik.de/europe/great-britain/england/greater-london.html
-	// Stored at https://gist.github.com/AlekSi/d4369aa13cf1fc5ddfac3e91b67b2f7b
-	London    = "greater-london-140324.osm.pbf"
-	LondonURL = "https://gist.githubusercontent.com/AlekSi/d4369aa13cf1fc5ddfac3e91b67b2f7b/raw/f87959d6c9466547d9759971e071a15049b67ae2/greater-london-140324.osm.pbf"
+	London = "greater-london-140324.osm.pbf"
+
+	// Same file as above, but without 'DenseNodes'. This has been generated using the below command (using osmium-tool http://osmcode.org/osmium-tool/)
+	// "osmium cat -o  greater-london-140324-nondense.osm.pbf greater-london-140324.osm.pbf -f osm.pbf,pbf_dense_nodes=false"
+	LondonNonDense = "greater-london-140324-nondense.osm.pbf"
 )
 
 func parseTime(s string) time.Time {
@@ -141,8 +147,8 @@ func init() {
 	}
 }
 
-func downloadTestOSMFile(t *testing.T) {
-	_, err := os.Stat(London)
+func downloadTestOSMFile(fileName string, t *testing.T) {
+	_, err := os.Stat(fileName)
 	if err == nil {
 		return
 	}
@@ -150,7 +156,7 @@ func downloadTestOSMFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := http.Get(LondonURL)
+	resp, err := http.Get(GistURL + fileName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +166,7 @@ func downloadTestOSMFile(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 
-	out, err := os.Create(London)
+	out, err := os.Create(fileName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,10 +205,10 @@ func checkHeader(a *Header) bool {
 	return true
 }
 
-func TestDecode(t *testing.T) {
-	downloadTestOSMFile(t)
+func decodePBF(PBFfileName string, t *testing.T) {
+	downloadTestOSMFile(PBFfileName, t)
 
-	f, err := os.Open(London)
+	f, err := os.Open(PBFfileName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,8 +294,16 @@ func TestDecode(t *testing.T) {
 	}
 }
 
+func TestDecodePBFWithDenseNodes(t *testing.T) {
+	decodePBF(London, t)
+}
+
+func TestDecodePBFWithNodes(t *testing.T) {
+	decodePBF(LondonNonDense, t)
+}
+
 func TestDecodeConcurrent(t *testing.T) {
-	downloadTestOSMFile(t)
+	downloadTestOSMFile(London, t)
 
 	f, err := os.Open(London)
 	if err != nil {

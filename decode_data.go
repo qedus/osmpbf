@@ -62,8 +62,6 @@ func (dec *dataDecoder) parseNodes(pb *OSMPBF.PrimitiveBlock, nodes []*OSMPBF.No
 		info := extractInfo(st, node.GetInfo(), dateGranularity)
 
 		dec.q = append(dec.q, &Node{id, latitude, longitude, tags, info})
-
-		panic("Please test this first")
 	}
 
 }
