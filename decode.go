@@ -303,7 +303,7 @@ func (dec *Decoder) readBlob(blobHeader *OSMPBF.BlobHeader) (*OSMPBF.Blob, error
 }
 
 func getData(blob *OSMPBF.Blob) ([]byte, error) {
-	switch _ := blob.Data.(type) {
+	switch blob.Data.(type) {
 	case *OSMPBF.Blob_Raw:
 		return blob.GetRaw(), nil
 
