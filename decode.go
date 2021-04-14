@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/qedus/osmpbf/OSMPBF"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -303,11 +303,11 @@ func (dec *Decoder) readBlob(blobHeader *OSMPBF.BlobHeader) (*OSMPBF.Blob, error
 }
 
 func getData(blob *OSMPBF.Blob) ([]byte, error) {
-	switch {
-	case blob.Raw != nil:
+	switch _ := blob.Data.(type) {
+	case *OSMPBF.Blob_Raw:
 		return blob.GetRaw(), nil
 
-	case blob.ZlibData != nil:
+	case *OSMPBF.Blob_ZlibData:
 		r, err := zlib.NewReader(bytes.NewReader(blob.GetZlibData()))
 		if err != nil {
 			return nil, err
@@ -367,10 +367,10 @@ func (dec *Decoder) decodeOSMHeader(blob *OSMPBF.Blob) error {
 
 	// Read properties to header struct
 	header := &Header{
-		RequiredFeatures: headerBlock.GetRequiredFeatures(),
-		OptionalFeatures: headerBlock.GetOptionalFeatures(),
-		WritingProgram:   headerBlock.GetWritingprogram(),
-		Source:           headerBlock.GetSource(),
+		RequiredFeatures:                 headerBlock.GetRequiredFeatures(),
+		OptionalFeatures:                 headerBlock.GetOptionalFeatures(),
+		WritingProgram:                   headerBlock.GetWritingprogram(),
+		Source:                           headerBlock.GetSource(),
 		OsmosisReplicationBaseUrl:        headerBlock.GetOsmosisReplicationBaseUrl(),
 		OsmosisReplicationSequenceNumber: headerBlock.GetOsmosisReplicationSequenceNumber(),
 	}
