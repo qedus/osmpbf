@@ -7,7 +7,6 @@ on:
     branches: [ master ]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
@@ -29,3 +28,9 @@ jobs:
       
     - name: Bench
       run: make bench
+
+    - name: Goveralls
+      uses: shogo82148/actions-goveralls@v1.4.3
+      with:
+        path-to-profile: profile.cov
+
