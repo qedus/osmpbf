@@ -1,32 +1,27 @@
 # Proto Files
 
-*.proto files were downloaded from https://github.com/scrosby/OSM-binary/tree/master/src and changed in following ways:
+`*.proto` files were downloaded from https://github.com/scrosby/OSM-binary/tree/master/src and changed in following ways:
 
 ## Changes
+
 ### StringTable
-- **File**: osmformat.proto
+
+- **File**: `osmformat.proto`
 - **Reason**: To eliminate continuous conversions from `[]byte` to `string`
-- **Old Code**:
+- **Old code**:
+
 ```protobuf
 message StringTable {
    repeated bytes s = 1;
 }
 ```
-- **New Code**:
+
+- **New code**:
 
 ```protobuf
 message StringTable {
    repeated string s = 1;
 }
 ```
-- **Comptatibility**: This changes is expected to be fully compatible with all PBF files.
 
-### Optimization Goal
-- **File**: osmformat.proto, fileformat.proto
-- **Reason**: Better performance
-- **Added Code**:
-
-```protobuf
-option optimize_for = LITE_RUNTIME;
-```
-- **Comptatibility**: Descriptors or Reflection are not available.
+- **Comptatibility**: This change is expected to be fully compatible with all PBF files.
