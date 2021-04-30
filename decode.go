@@ -324,7 +324,7 @@ func getData(blob *OSMPBF.Blob) ([]byte, error) {
 		return buf.Bytes(), nil
 
 	default:
-		return nil, errors.New("unknown blob data")
+		return nil, fmt.Errorf("unhandled blob data type %T", blob.Data)
 	}
 }
 
