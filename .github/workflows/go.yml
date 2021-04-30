@@ -1,35 +1,49 @@
+---
 name: Go
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
   pull_request:
-    branches: [ master ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go:
+          - 1.16.x
+          - tip
+
+    name: Build
+    runs-on: ubuntu-20.04
+
     steps:
-    - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.16.x
+      - name: Setup Go ${{ matrix.go }}
+        if: ${{ matrix.go != 'tip' }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.x
 
-    - name: Init
-      run: make init
+      - name: Setup Go tip
+        if: ${{ matrix.go == 'tip' }}
+        run: |
+          which -a go
+          go env
 
-    - name: Race
-      run: make race
+      - name: Install tools
+        run: make init
 
-    - name: Cover
-      run: make cover
+      - name: Test with race detector
+        run: make race
 
-    - name: Bench
-      run: make bench
+      - name: Gather test coverage
+        run: make cover
 
-    - name: Goveralls
-      uses: shogo82148/actions-goveralls@v1.4.3
-      with:
-        path-to-profile: profile.cov
+      - name: Upload test coverage report to coveralls.io
+        uses: shogo82148/actions-goveralls@v1.4.3
+        with:
+          path-to-profile: profile.cov

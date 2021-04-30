@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.0 (untagged yet)
+
+* Converted to Go module.
+* Updated .proto files.
+* Updated protobuf dependency.
+* Migrated CI to GitHub Actions.
+
 ## v1.1.0 (tagged 2018-03-29)
 
 * Added [`Decoder.Header()` method](https://godoc.org/github.com/qedus/osmpbf#Decoder.Header)
