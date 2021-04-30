@@ -3,42 +3,55 @@ name: Go
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
   pull_request:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        go:
-          - 1.16.x
-          - tip
-
     name: Build
+
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [1.16.x]
+        may-fail: [false]
+        include:
+          - go: tip
+            may-fail: true
+
     runs-on: ubuntu-20.04
+    continue-on-error: ${{ matrix.may-fail }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Setup Go ${{ matrix.go }}
+      - name: Setup Go v${{ matrix.go }}
         if: ${{ matrix.go != 'tip' }}
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16.x
+          go-version: ${{ matrix.go }}
 
       - name: Setup Go tip
         if: ${{ matrix.go == 'tip' }}
         run: |
           which -a go
+          curl -OL https://github.com/AlekSi/golang-tip/releases/download/tip/master.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf master.linux-amd64.tar.gz
+          sudo ln -vsf /usr/local/golang-tip/bin/* /usr/bin/
+          sudo ln -vsf /usr/local/golang-tip/bin/* /bin/
+          go version
           go env
 
       - name: Install tools
         run: make init
 
       - name: Test with race detector
-        run: make race
+        run: |
+          which -a go
+          go version
+          go env
+          make race
 
       - name: Gather test coverage
         run: make cover
