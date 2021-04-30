@@ -3,7 +3,7 @@
 ## v1.2.0 (untagged yet)
 
 * Converted to Go module.
-* Updated .proto files.
+* Updated .proto files ([#35](https://github.com/qedus/osmpbf/pull/35) by Lucas).
 * Updated protobuf dependency.
 * Migrated CI to GitHub Actions.
 
