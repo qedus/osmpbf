@@ -56,6 +56,11 @@ jobs:
       - name: Gather test coverage
         run: make cover
 
+      # see https://github.com/shogo82148/actions-goveralls/issues/214
+      - name: Configure environment for goveralls
+        run: |
+          echo "GOROOT=$(go env GOROOT)" >> $GITHUB_ENV
+
       - name: Upload test coverage report to coveralls.io
         uses: shogo82148/actions-goveralls@v1.4.3
         with:
