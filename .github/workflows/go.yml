@@ -37,11 +37,11 @@ jobs:
         run: |
           curl -OL https://github.com/AlekSi/golang-tip/releases/download/tip/master.linux-amd64.tar.gz
           sudo rm -rf /usr/local/go
-          sudo rm -rf /opt/hostedtoolcache/go
+          # sudo rm -rf /opt/hostedtoolcache/go
           sudo tar -C /usr/local -xzf master.linux-amd64.tar.gz
           sudo ln -vsf /usr/local/go/bin/* /usr/bin/
           sudo ln -vsf /usr/local/go/bin/* /bin/
-          echo "GOROOT=$(go env GOROOT)" >> $GITHUB_ENV
+          # echo "GOROOT=$(go env GOROOT)" >> $GITHUB_ENV
 
       - name: Run debug commands
         run: |
