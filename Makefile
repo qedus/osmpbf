@@ -3,7 +3,7 @@ export GORACE := halt_on_error=1
 all: cover
 
 init:
-	go get -u golang.org/x/perf/cmd/benchstat
+	go install -v golang.org/x/perf/cmd/benchstat@latest
 
 race:
 	go install -v -race

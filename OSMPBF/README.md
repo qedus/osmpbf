@@ -1,6 +1,14 @@
-*.proto files were downloaded from https://github.com/scrosby/OSM-binary/tree/master/src and changed in following ways:
+# Proto Files
 
-* To eliminate continuous conversions from `[]byte` to `string`, this
+`*.proto` files were downloaded from https://github.com/scrosby/OSM-binary/tree/master/src and changed in following ways:
+
+## Changes
+
+### StringTable
+
+- **File**: `osmformat.proto`
+- **Reason**: To eliminate continuous conversions from `[]byte` to `string`
+- **Old code**:
 
 ```protobuf
 message StringTable {
@@ -8,7 +16,7 @@ message StringTable {
 }
 ```
 
-was changed to
+- **New code**:
 
 ```protobuf
 message StringTable {
@@ -16,4 +24,4 @@ message StringTable {
 }
 ```
 
-This changes is expected to be fully compatible with all PBF files.
+- **Comptatibility**: This change is expected to be fully compatible with all PBF files.
