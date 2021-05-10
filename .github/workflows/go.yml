@@ -58,6 +58,6 @@ jobs:
         run: make cover
 
       - name: Upload test coverage report to coveralls.io
-        uses: shogo82148/actions-goveralls@v1.4.3
+        uses: shogo82148/actions-goveralls@v1.4.4
         with:
           path-to-profile: profile.cov
