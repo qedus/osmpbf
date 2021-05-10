@@ -35,11 +35,15 @@ jobs:
       - name: Setup Go tip
         if: ${{ matrix.go == 'tip' }}
         run: |
-          which -a go
           curl -OL https://github.com/AlekSi/golang-tip/releases/download/tip/master.linux-amd64.tar.gz
+          sudo rm -rf /usr/local/go
           sudo tar -C /usr/local -xzf master.linux-amd64.tar.gz
-          sudo ln -vsf /usr/local/golang-tip/bin/* /usr/bin/
-          sudo ln -vsf /usr/local/golang-tip/bin/* /bin/
+          sudo ln -vsf /usr/local/go/bin/* /usr/bin/
+          sudo ln -vsf /usr/local/go/bin/* /bin/
+
+      - name: Run debug commands
+        run: |
+          which -a go
           go version
           go env
 
@@ -47,19 +51,10 @@ jobs:
         run: make init
 
       - name: Test with race detector
-        run: |
-          which -a go
-          go version
-          go env
-          make race
+        run: make race
 
       - name: Gather test coverage
         run: make cover
-
-      # see https://github.com/shogo82148/actions-goveralls/issues/214
-      - name: Configure environment for goveralls
-        run: |
-          echo "GOROOT=$(go env GOROOT)" >> $GITHUB_ENV
 
       - name: Upload test coverage report to coveralls.io
         uses: shogo82148/actions-goveralls@v1.4.3
