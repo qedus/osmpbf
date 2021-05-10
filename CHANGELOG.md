@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.2.0 (untagged yet)
+## v1.2.0 (tagged 2021-05-10)
 
 * Converted to Go module.
 * Updated .proto files ([#35](https://github.com/qedus/osmpbf/pull/35) by Lucas).
