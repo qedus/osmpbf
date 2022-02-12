@@ -395,6 +395,10 @@ func BenchmarkDecode(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer f.Close()
+	fileInfo, err := f.Stat()
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	blobBufferSize, _ := strconv.Atoi(os.Getenv("OSMPBF_BENCHMARK_BUFFER"))
 
@@ -436,6 +440,7 @@ func BenchmarkDecode(b *testing.B) {
 
 		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
 			time.Since(start).Seconds(), nc, wc, rc)
+		b.SetBytes(fileInfo.Size())
 	}
 }
 
@@ -449,6 +454,10 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer f.Close()
+	fileInfo, err := f.Stat()
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	blobBufferSize, _ := strconv.Atoi(os.Getenv("OSMPBF_BENCHMARK_BUFFER"))
 
@@ -502,5 +511,6 @@ func BenchmarkDecodeConcurrent(b *testing.B) {
 
 		b.Logf("Done in %.3f seconds. Nodes: %d, Ways: %d, Relations: %d\n",
 			time.Since(start).Seconds(), nc, wc, rc)
+		b.SetBytes(fileInfo.Size())
 	}
 }
